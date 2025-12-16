@@ -1,0 +1,99 @@
+# ==============================================================================
+# Unreal Engine Standard Ignore Rules
+# ==============================================================================
+
+# 编译生成的二进制文件 (必须忽略，每次编译都会变)
+Binaries/
+*/Binaries/
+
+# 中间构建文件 (体积巨大，包含C++编译过程文件，必须忽略)
+Intermediate/
+*/Intermediate/
+
+# 本地保存的配置、日志、截图、自动保存 (包含用户本地偏好，不应共享)
+Saved/
+*/Saved/
+
+# 派生数据缓存 (着色器编译缓存等，体积巨大，每个人本地生成)
+DerivedDataCache/
+
+# 自动生成的构建规则 (通常不需要提交)
+Build/Receipts/
+Build/Siguature/
+
+# ==============================================================================
+# IDE / Editor Files (Visual Studio, Rider, VSCode, Xcode)
+# ==============================================================================
+
+# Visual Studio 解决方案文件 (UE会根据 .uproject 自动生成)
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.user
+*.v2
+.vs/
+.vscode/
+
+# JetBrains Rider
+.idea/
+*.sln.DotSettings.user
+
+# Xcode (MacOS)
+*.xcodeproj
+*.xcworkspace
+*.mode1v3
+*.mode2v3
+*.pbuser
+*.perspectivev3
+xcuserdata
+
+# Makefile (Linux)
+Makefile
+
+# CMake
+CMakeLists.txt
+cmake-build-debug/
+
+# ==============================================================================
+# Plugins (插件生成的临时文件)
+# ==============================================================================
+
+# 忽略插件目录下的编译和中间文件，但保留插件源码和资源
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+Plugins/*/Saved/
+
+# ==============================================================================
+# OS Generated Files (操作系统生成的文件)
+# ==============================================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ==============================================================================
+# Custom & Asset Source Files (可选 - 根据你的需求调整)
+# ==============================================================================
+
+# 崩溃转储文件
+*.dump
+*.dmp
+
+# 如果你不想上传巨大的源文件 (如 .psd, .blend)，可以取消下面的注释
+# *.psd
+# *.blend
+# *.fbx
+# *.obj
+
+# 虚幻引擎自动备份
+*_Backup.uasset
+*_Backup.umap
