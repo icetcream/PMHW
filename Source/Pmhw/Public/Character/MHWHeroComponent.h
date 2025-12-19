@@ -43,17 +43,21 @@ public:
 	void InitializePlayerInput(UInputComponent* PlayerInputComponent);
 
 protected:
+	// --- Actor Interface ---
 	virtual void BeginPlay() override;
+	// --- Actor Interface End---
 
+	// --- MHWPawnComponent ---
+	virtual void OnActorInitStateChanged(FGameplayTag CurrentState) override;
+	// --- MHWPawnComponent End ---
+	
 	void Input_Move(const FInputActionValue& InputActionValue);
 	void Input_LookMouse(const FInputActionValue& InputActionValue);
 	void Input_LookStick(const FInputActionValue& InputActionValue);
 	void Input_Crouch(const FInputActionValue& InputActionValue);
 	void Input_AutoRun(const FInputActionValue& InputActionValue);
 	
-	UPROPERTY(EditDefaultsOnly, Category = "MHW|Input")
-	TObjectPtr<UMHWInputConfig> InputConfig;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "MHW|Input")
 	TArray<FInputMappingContextAndPriority> DefaultInputMappings;
 private:

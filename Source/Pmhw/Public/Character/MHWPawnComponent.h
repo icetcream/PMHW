@@ -7,6 +7,8 @@
 #include "MHWPawnComponent.generated.h"
 
 
+struct FGameplayTag;
+
 UCLASS()
 class PMHW_API UMHWPawnComponent : public UActorComponent
 {
@@ -16,6 +18,8 @@ public:
 	
 	UMHWPawnComponent(const FObjectInitializer& ObjectInitializer);
 
+	virtual void OnActorInitStateChanged(FGameplayTag CurrentState);
+	
 	/** Gets the pawn that owns the component, this will always be valid during gameplay but can return null in the editor */
 	template <class T>
 	T* GetPawn() const
@@ -50,4 +54,5 @@ public:
 		static_assert(TPointerIsConvertibleFromTo<T, AController>::Value, "'T' template parameter to GetController must be derived from AController");
 		return GetPawnChecked<APawn>()->GetController<T>();
 	}
+
 };

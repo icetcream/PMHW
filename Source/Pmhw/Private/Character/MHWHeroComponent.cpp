@@ -5,10 +5,14 @@
 
 #include "EnhancedInputSubsystems.h"
 #include "MHWGameplayTags.h"
+#include "Character/MHWPawnData.h"
+#include "Character/MHWPawnExtensionComponent.h"
 #include "Input/MHWInputComponent.h"
 #include "Player/MHWLocalPlayer.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWHeroComponent)
+
+class UMHWPawnExtensionComponent;
 
 namespace MHWHero
 {
@@ -41,41 +45,63 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	check(Subsystem);
 
-	for (const FInputMappingContextAndPriority& Mapping : DefaultInputMappings)
+	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 	{
-		if (UInputMappingContext* IMC = Mapping.InputMapping.Get())
+		if (const UMHWPawnData* PawnData = PawnExtComp->GetPawnData<UMHWPawnData>())
 		{
-			FModifyContextOptions Options = {};
-            Options.bIgnoreAllPressedKeysUntilRelease = false;
-            // Actually add the config to the local player							
-            Subsystem->AddMappingContext(IMC, Mapping.Priority, Options);
+			if (const UMHWInputConfig* InputConfig = PawnData->InputConfig)
+			{
+				for (const FInputMappingContextAndPriority& Mapping : DefaultInputMappings)
+				{
+					if (UInputMappingContext* IMC = Mapping.InputMapping.Get())
+					{
+						FModifyContextOptions Options = {};
+						Options.bIgnoreAllPressedKeysUntilRelease = false;
+						// Actually add the config to the local player							
+						Subsystem->AddMappingContext(IMC, Mapping.Priority, Options);
+					}
+				}
+				UMHWInputComponent* MHWIC = Cast<UMHWInputComponent>(PlayerInputComponent);
+				if (ensureMsgf(MHWIC, TEXT("Unexpected Input Component class! The Gameplay Abilities will not be bound to their inputs. Change the input component to UMHWInputComponent or a subclass of it.")))
+				{
+					// Add the key mappings that may have been set by the player
+					MHWIC->AddInputMappings(InputConfig, Subsystem);
+
+					// This is where we actually bind and input action to a gameplay tag, which means that Gameplay Ability Blueprints will
+					// be triggered directly by these input actions Triggered events.
+		
+					//TArray<uint32> BindHandles;
+					//MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
+
+					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Stick, ETriggerEvent::Triggered, this, &ThisClass::Input_LookStick, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
+				}
+			}
 		}
 	}
+
 	
-	UMHWInputComponent* MHWIC = Cast<UMHWInputComponent>(PlayerInputComponent);
-	if (ensureMsgf(MHWIC, TEXT("Unexpected Input Component class! The Gameplay Abilities will not be bound to their inputs. Change the input component to UMHWInputComponent or a subclass of it.")))
-	{
-		// Add the key mappings that may have been set by the player
-		MHWIC->AddInputMappings(InputConfig, Subsystem);
-
-		// This is where we actually bind and input action to a gameplay tag, which means that Gameplay Ability Blueprints will
-		// be triggered directly by these input actions Triggered events.
-		
-		//TArray<uint32> BindHandles;
-		//MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
-
-		MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
-		MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
-		MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Stick, ETriggerEvent::Triggered, this, &ThisClass::Input_LookStick, /*bLogIfNotFound=*/ false);
-		MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
-		MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
-	}
 
 }
 
 void UMHWHeroComponent::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
+{
+	if (CurrentState == FGameplayTag::RequestGameplayTag("State.GameplayReady"))
+	{
+		APawn* Pawn = GetPawn<APawn>();
+		if (Pawn && Pawn->InputComponent)
+		{
+			InitializePlayerInput(Pawn->InputComponent);
+		}
+	}
 }
 
 void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)

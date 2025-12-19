@@ -11,6 +11,12 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Crouch, "InputTag.Crouch");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_AutoRun, "InputTag.AutoRun");
 
+
+	// --- 初始化阶段 ---
+	UE_DEFINE_GAMEPLAY_TAG(InitState_Spawned, "InitState.Spawned");
+	UE_DEFINE_GAMEPLAY_TAG(InitState_DataAvailable, "InitState.DataAvailable");
+	UE_DEFINE_GAMEPLAY_TAG(InitState_DataInitialized, "InitState.DataInitialized");
+	UE_DEFINE_GAMEPLAY_TAG(InitState_GameplayReady, "InitState.GameplayReady");
 	
 	/*
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_PrimaryAttack, "InputTag.Ability.Primary");
