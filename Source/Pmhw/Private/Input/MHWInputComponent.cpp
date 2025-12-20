@@ -3,6 +3,8 @@
 
 #include "Pmhw/Public/Input/MHWInputComponent.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(MHWInputComponent)
+
 UMHWInputComponent::UMHWInputComponent(const FObjectInitializer& ObjectInitializer)
 {
 	

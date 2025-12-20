@@ -94,9 +94,10 @@ void UMHWHeroComponent::BeginPlay()
 
 void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 {
-	if (CurrentState == FGameplayTag::RequestGameplayTag("State.GameplayReady"))
+	if (CurrentState == MHWTags::InitState_GameplayReady)
 	{
 		APawn* Pawn = GetPawn<APawn>();
+		// TODO:InputComponent次序问题待修复
 		if (Pawn && Pawn->InputComponent)
 		{
 			InitializePlayerInput(Pawn->InputComponent);

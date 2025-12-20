@@ -22,7 +22,7 @@ public:
 };
 
 // Lyra 的 ULyraInputConfig
-UCLASS()
+UCLASS(BlueprintType, Const)
 class PMHW_API UMHWInputConfig : public UDataAsset
 {
 	GENERATED_BODY()

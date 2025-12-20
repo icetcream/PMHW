@@ -17,33 +17,41 @@ class PMHW_API UMHWPawnExtensionComponent : public UMHWPawnComponent
 public:
 	UMHWPawnExtensionComponent(const FObjectInitializer& ObjectInitializer);
 
-	UFUNCTION(BlueprintPure, Category = "Lyra|Pawn")
+	UFUNCTION(BlueprintPure, Category = "MHW|Pawn")
 	static UMHWPawnExtensionComponent* FindPawnExtensionComponent(const AActor* Actor) { return (Actor ? Actor->FindComponentByClass<UMHWPawnExtensionComponent>() : nullptr); }
 	
 	template <class T>
 	const T* GetPawnData() const { return Cast<T>(PawnData); }
 	
 	void SetPawnData(const UMHWPawnData* InPawnData);
+
+	void SetIsInput(bool isInput);
 	
 	bool CanChangeInitState(FGameplayTag NextState) const;
 	void CheckInitialization();
 	void HandleInitStateChange(FGameplayTag NewState);
-protected:
 
+	void GetAllComponentFromCharacter();
+protected:
+	// --- Actor ---
 	virtual void OnRegister() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	// --- Actor ---
 	
 	/** Pawn data used to create the pawn. Specified from a spawn function or on a placed instance. */
-	UPROPERTY(EditInstanceOnly, Category = "Lyra|Pawn")
+	UPROPERTY(EditDefaultsOnly, Category = "MHW|Pawn")
 	TObjectPtr<const UMHWPawnData> PawnData;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "InitState")
 	FGameplayTag CurrentInitState;
 	
-	
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMHWPawnComponent>> RegisteredMHWComponents;
+
+	bool bIsInputSet = false;
 };
+
+
 
 

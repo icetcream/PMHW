@@ -34,31 +34,53 @@ void UMHWPawnExtensionComponent::SetPawnData(const UMHWPawnData* InPawnData)
 	CheckInitialization();
 }
 
+void UMHWPawnExtensionComponent::SetIsInput(bool isInput)
+{
+	bIsInputSet = isInput;
+}
+
+void UMHWPawnExtensionComponent::GetAllComponentFromCharacter()
+{
+	APawn* Pawn = GetPawn<APawn>();
+	if (Pawn)
+	{
+		TArray<UMHWPawnComponent*> FoundComponents;
+		Pawn->GetComponents(FoundComponents);
+        
+		for (UMHWPawnComponent* Comp : FoundComponents)
+		{
+			RegisteredMHWComponents.Add(Comp);
+		}
+	}
+	
+	CheckInitialization();
+}
+
 bool UMHWPawnExtensionComponent::CanChangeInitState(FGameplayTag NextState) const
 {
 	APawn* Pawn = GetPawn<APawn>();
 	if (!Pawn) return false;
 
-	if (NextState == FGameplayTag::RequestGameplayTag("State.Spawned"))
+	if (NextState == MHWTags::InitState_Spawned)
 		return true;
 
-	if (NextState == FGameplayTag::RequestGameplayTag("State.DataAvailable"))
+	if (NextState == MHWTags::InitState_DataAvailable)
 	{
 		// 必须要有控制器 (PossessedBy 触发后此项才会为真)
 		return Pawn->GetController() != nullptr;
 	}
 
-	if (NextState == FGameplayTag::RequestGameplayTag("State.DataInitialized"))
+	if (NextState == MHWTags::InitState_DataInitialized)
 	{
 		// 只要 DataAvailable 过了，通常这一步自动放行，
 		// 因为这一步是用来给 CombatComponent 执行 InitAbilityActorInfo 的时机
 		return true;
 	}
 
-	if (NextState == FGameplayTag::RequestGameplayTag("State.GameplayReady"))
+	if (NextState == MHWTags::InitState_GameplayReady)
 	{
 		// 必须等到 SetupPlayerInputComponent 被调用后
-		return true;
+		return bIsInputSet;
 	}
 
 	return false;
@@ -92,20 +114,6 @@ void UMHWPawnExtensionComponent::CheckInitialization()
 void UMHWPawnExtensionComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	APawn* Pawn = GetPawn<APawn>();
-	if (Pawn)
-	{
-		TArray<UMHWPawnComponent*> FoundComponents;
-		Pawn->GetComponents(FoundComponents);
-        
-		for (UMHWPawnComponent* Comp : FoundComponents)
-		{
-			RegisteredMHWComponents.Add(Comp);
-		}
-	}
-	
-	CheckInitialization();
 }
 
 void UMHWPawnExtensionComponent::HandleInitStateChange(FGameplayTag NewState)

@@ -7,7 +7,7 @@
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Input/MHWInputComponent.h"
 
-
+#include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCharacter)
 
 AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -17,6 +17,17 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 
 	MHWPawnExtensionComponent = CreateDefaultSubobject<UMHWPawnExtensionComponent>(TEXT("MHWPawnExtensionComponent"));
 }
+
+void AMHWCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	if (MHWPawnExtensionComponent)
+	{
+		MHWPawnExtensionComponent->GetAllComponentFromCharacter();
+	}
+}
+
 
 void AMHWCharacter::BeginPlay()
 {
@@ -39,9 +50,10 @@ void AMHWCharacter::PossessedBy(AController* NewController)
 void AMHWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
+	
 	if (MHWPawnExtensionComponent)
 	{
+		MHWPawnExtensionComponent->SetIsInput(true);
 		MHWPawnExtensionComponent->CheckInitialization();
 	}
 }
