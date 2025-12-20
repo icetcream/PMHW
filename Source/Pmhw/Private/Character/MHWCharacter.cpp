@@ -16,6 +16,9 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	// 这是 Lyra 的关键技巧之一
 
 	MHWPawnExtensionComponent = CreateDefaultSubobject<UMHWPawnExtensionComponent>(TEXT("MHWPawnExtensionComponent"));
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = true;
+	bUseControllerRotationRoll = false;
 }
 
 void AMHWCharacter::PostInitializeComponents()

@@ -97,3 +97,7 @@ $RECYCLE.BIN/
 # 虚幻引擎自动备份
 *_Backup.uasset
 *_Backup.umap
+
+
+# 测试文件
+/Content/Test/
