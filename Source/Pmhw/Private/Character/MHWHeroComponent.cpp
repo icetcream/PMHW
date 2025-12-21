@@ -9,6 +9,8 @@
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Input/MHWInputComponent.h"
 #include "Player/MHWLocalPlayer.h"
+#include "Player/MHWPlayerController.h"
+#include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWHeroComponent)
 
@@ -94,14 +96,43 @@ void UMHWHeroComponent::BeginPlay()
 
 void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 {
+	//TODO；可能之后修改这个初始化的阶段
 	if (CurrentState == MHWTags::InitState_GameplayReady)
 	{
 		APawn* Pawn = GetPawn<APawn>();
-		// TODO:InputComponent次序问题待修复
-		if (Pawn && Pawn->InputComponent)
+		AMHWPlayerState* MHWPS = GetPlayerState<AMHWPlayerState>();
+		if (!ensure(Pawn && MHWPS))
 		{
-			InitializePlayerInput(Pawn->InputComponent);
+			return;
 		}
+
+		const UMHWPawnData* PawnData = nullptr;
+
+		if (UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+		{
+			PawnData = PawnExtComp->GetPawnData<UMHWPawnData>();
+
+			// The player state holds the persistent data for this player (state that persists across deaths and multiple pawns).
+			// The ability system component and attribute sets live on the player state.
+			PawnExtComp->InitializeAbilitySystem(MHWPS->GetMHWAbilitySystemComponent(), MHWPS);
+		}
+
+		if (AMHWPlayerController* MHWPC = GetController<AMHWPlayerController>())
+		{
+			if (Pawn->InputComponent != nullptr)
+			{
+				InitializePlayerInput(Pawn->InputComponent);
+			}
+		}
+
+		// Hook up the delegate for all pawns, in case we spectate later
+		/*if (PawnData)
+		{
+			if (UMHWCameraComponent* CameraComponent = UMHWCameraComponent::FindCameraComponent(Pawn))
+			{
+				CameraComponent->DetermineCameraModeDelegate.BindUObject(this, &ThisClass::DetermineCameraMode);
+			}
+		}*/
 	}
 }
 

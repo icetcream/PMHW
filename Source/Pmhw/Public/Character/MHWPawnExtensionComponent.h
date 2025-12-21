@@ -8,6 +8,7 @@
 #include "MHWPawnExtensionComponent.generated.h"
 
 
+class UMHWAbilitySystemComponent;
 class UMHWPawnData;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -32,6 +33,10 @@ public:
 	void HandleInitStateChange(FGameplayTag NewState);
 
 	void GetAllComponentFromCharacter();
+	/** Should be called by the owning pawn to become the avatar of the ability system. */
+	void InitializeAbilitySystem(UMHWAbilitySystemComponent* InASC, AActor* InOwnerActor);
+	/** Should be called by the owning pawn to remove itself as the avatar of the ability system. */
+	void UninitializeAbilitySystem();
 protected:
 	// --- Actor ---
 	virtual void OnRegister() override;
@@ -48,6 +53,12 @@ protected:
 	
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMHWPawnComponent>> RegisteredMHWComponents;
+	
+	FSimpleMulticastDelegate OnAbilitySystemUninitialized;
+	FSimpleMulticastDelegate OnAbilitySystemInitialized;
+	/** Pointer to the ability system component that is cached for convenience. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMHWAbilitySystemComponent> AbilitySystemComponent;
 
 	bool bIsInputSet = false;
 };

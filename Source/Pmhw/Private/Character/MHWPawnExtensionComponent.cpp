@@ -6,6 +6,9 @@
 #include "GameplayTagContainer.h"
 #include "MHWGameplayTags.h"
 #include "MHWLogChannels.h"
+#include "AbilitySystem/MHWAbilitySystemComponent.h"
+#include "Player/MHWPlayerController.h"
+#include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWPawnExtensionComponent)
 
@@ -39,6 +42,7 @@ void UMHWPawnExtensionComponent::SetIsInput(bool isInput)
 	bIsInputSet = isInput;
 }
 
+
 void UMHWPawnExtensionComponent::GetAllComponentFromCharacter()
 {
 	APawn* Pawn = GetPawn<APawn>();
@@ -54,6 +58,83 @@ void UMHWPawnExtensionComponent::GetAllComponentFromCharacter()
 	}
 	
 	CheckInitialization();
+}
+
+void UMHWPawnExtensionComponent::InitializeAbilitySystem(UMHWAbilitySystemComponent* InASC, AActor* InOwnerActor)
+{
+	check(InASC);
+	check(InOwnerActor);
+
+	if (AbilitySystemComponent == InASC)
+	{
+		// The ability system component hasn't changed.
+		return;
+	}
+
+	if (AbilitySystemComponent)
+	{
+		// Clean up the old ability system component.
+		UninitializeAbilitySystem();
+	}
+
+	APawn* Pawn = GetPawnChecked<APawn>();
+	AActor* ExistingAvatar = InASC->GetAvatarActor();
+
+	UE_LOG(LogPMHW, Verbose, TEXT("Setting up ASC [%s] on pawn [%s] owner [%s], existing [%s] "), *GetNameSafe(InASC), *GetNameSafe(Pawn), *GetNameSafe(InOwnerActor), *GetNameSafe(ExistingAvatar));
+
+	if ((ExistingAvatar != nullptr) && (ExistingAvatar != Pawn))
+	{
+		if (UMHWPawnExtensionComponent* OtherExtensionComponent = FindPawnExtensionComponent(ExistingAvatar))
+		{
+			OtherExtensionComponent->UninitializeAbilitySystem();
+		}
+	}
+
+	AbilitySystemComponent = InASC;
+	AbilitySystemComponent->InitAbilityActorInfo(InOwnerActor, Pawn);
+
+	if (ensure(PawnData))
+	{
+		/*InASC->SetTagRelationshipMapping(PawnData->TagRelationshipMapping);*/
+	}
+
+	OnAbilitySystemInitialized.Broadcast();
+}
+
+void UMHWPawnExtensionComponent::UninitializeAbilitySystem()
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	// Uninitialize the ASC if we're still the avatar actor (otherwise another pawn already did it when they became the avatar actor)
+	if (AbilitySystemComponent->GetAvatarActor() == GetOwner())
+	{
+		/*
+		 * 卸下AbilityComponent的时候取消的能力
+		FGameplayTagContainer AbilityTypesToIgnore;
+		AbilityTypesToIgnore.AddTag(MHWGameplayTags::Ability_Behavior_SurvivesDeath);
+
+		AbilitySystemComponent->CancelAbilities(nullptr, &AbilityTypesToIgnore);
+		*/
+		AbilitySystemComponent->ClearAbilityInput();
+		AbilitySystemComponent->RemoveAllGameplayCues();
+
+		if (AbilitySystemComponent->GetOwnerActor() != nullptr)
+		{
+			AbilitySystemComponent->SetAvatarActor(nullptr);
+		}
+		else
+		{
+			// If the ASC doesn't have a valid owner, we need to clear *all* actor info, not just the avatar pairing
+			AbilitySystemComponent->ClearActorInfo();
+		}
+
+		OnAbilitySystemUninitialized.Broadcast();
+	}
+
+	AbilitySystemComponent = nullptr;
 }
 
 bool UMHWPawnExtensionComponent::CanChangeInitState(FGameplayTag NextState) const
@@ -106,7 +187,6 @@ void UMHWPawnExtensionComponent::CheckInitialization()
 		CurrentInitState = NextState;
 		
 		HandleInitStateChange(CurrentInitState);
-		
 		NextIndex++;
 	}
 }
