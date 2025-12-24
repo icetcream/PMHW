@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerState.h"
 #include "MHWPlayerState.generated.h"
 
+class UMHWEquipmentManagerComponent;
 class UMHWAbilitySystemComponent;
 /**
  * 

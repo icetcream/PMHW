@@ -5,6 +5,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "MHWGameplayTags.h"
 #include "Character/MHWPawnExtensionComponent.h"
+#include "Equipment/MHWEquipmentManagerComponent.h"
 #include "Input/MHWInputComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCharacter)
@@ -16,8 +17,9 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	// 这是 Lyra 的关键技巧之一
 
 	MHWPawnExtensionComponent = CreateDefaultSubobject<UMHWPawnExtensionComponent>(TEXT("MHWPawnExtensionComponent"));
+	MHWEquipmentManagerComponent = CreateDefaultSubobject<UMHWEquipmentManagerComponent>(TEXT("MHWEquipmentManagerComponent"));
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = true;
+	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 }
 
@@ -39,6 +41,28 @@ void AMHWCharacter::BeginPlay()
 	{
 		MHWPawnExtensionComponent->CheckInitialization();
 	}
+	/*// 场景：观察堆内存的重新分配
+	UE_LOG(LogTemp, Warning, TEXT("=== 测试默认分配器 ==="));
+
+	TArray<int32> HeapArray; // 默认 FDefaultAllocator
+
+	// 打印初始状态
+	UE_LOG(LogTemp, Log, TEXT("Start: Ptr=%p, Num=%d, Max=%d"), HeapArray.GetData(), HeapArray.Num(), HeapArray.Max());
+
+	// 逐步添加元素，观察指针变化
+	for (int32 i = 0; i < 10; ++i)
+	{
+		int32* OldPtr = HeapArray.GetData();
+		HeapArray.Add(i);
+		int32* NewPtr = HeapArray.GetData();
+
+		// 如果指针变了，说明发生了 Realloc（搬家）
+		if (OldPtr != NewPtr)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Trigger Realloc! Index: %d | Old: %p -> New: %p | Capacity: %d"), 
+				i, OldPtr, NewPtr, HeapArray.Max());
+		}
+	}*/
 }
 
 void AMHWCharacter::PossessedBy(AController* NewController)

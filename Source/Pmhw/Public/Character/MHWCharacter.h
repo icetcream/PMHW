@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h" // 需要包含 GameplayTags 模块
 #include "MHWCharacter.generated.h"
 
+class UMHWEquipmentManagerComponent;
 class UMHWPawnExtensionComponent;
 class UMHWHeroComponent;
 class UInputMappingContext;
@@ -26,8 +27,14 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Lyra|Character", Meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMHWPawnExtensionComponent> MHWPawnExtensionComponent;
+
+	UPROPERTY(VisibleAnywhere, Category = "MHW|Character")
+	TObjectPtr<UMHWEquipmentManagerComponent> MHWEquipmentManagerComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	FGameplayTagContainer CurrentComboState;
 };
 
 

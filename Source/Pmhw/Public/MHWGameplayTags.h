@@ -12,9 +12,7 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Look_Stick);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Crouch)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_AutoRun)
-
-
-
+	
 	// --- 初始化相关 ---
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_Spawned);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_DataAvailable);

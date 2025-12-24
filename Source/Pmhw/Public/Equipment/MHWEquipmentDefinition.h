@@ -19,6 +19,7 @@ struct FMHWEquipmentActorToSpawn
 	{}
 
 	UPROPERTY(EditAnywhere, Category=Equipment)
+	
 	TSubclassOf<AActor> ActorToSpawn;
 
 	UPROPERTY(EditAnywhere, Category=Equipment)
@@ -43,8 +44,8 @@ public:
 	UMHWEquipmentDefinition(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	// Class to spawn
-	/*UPROPERTY(EditDefaultsOnly, Category=Equipment)
-	TSubclassOf<UMHWEquipmentInstance> InstanceType;*/
+	UPROPERTY(EditDefaultsOnly, Category=Equipment)
+	TSubclassOf<UMHWEquipmentInstance> InstanceType;
 
 	// Gameplay ability sets to grant when this is equipped
 	UPROPERTY(EditDefaultsOnly, Category=Equipment)
