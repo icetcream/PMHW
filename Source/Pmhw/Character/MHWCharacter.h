@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "GameplayTagContainer.h" // 需要包含 GameplayTags 模块
 #include "MHWCharacter.generated.h"
@@ -14,7 +15,7 @@ class UMHWInputConfig;
 struct FInputActionValue;
 
 UCLASS()
-class PMHW_API AMHWCharacter : public ACharacter
+class PMHW_API AMHWCharacter : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -26,6 +27,8 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))

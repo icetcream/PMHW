@@ -193,10 +193,11 @@ void UMHWEquipmentManagerComponent::OnWeaponDrawnStateChanged(const FGameplayTag
     
 	if (bIsDrawn)
 	{
-		UMHWEquipmentInstance* Weapon = GetFirstInstanceOfType(UAnimInstance::StaticClass());
+		/*UMHWEquipmentInstance* Weapon = GetFirstInstanceOfType(UAnimInstance::StaticClass());
 		TArray<AActor*> SpawnActors = Weapon->GetSpawnedActors();
 		if (SpawnActors.IsEmpty()) return;
 		Weapon->GetSpawnedActors()[0]->AttachToActor(Weapon->GetPawn(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Hand_R_Socket"));
+		*/
 		// 链接战斗动画层
 		/*GetPawn<ACharacter>()->GetMesh()->LinkAnimClassLayers(Weapon);*/
 	}

@@ -6,7 +6,9 @@
 #include "MHWGameplayTags.h"
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Equipment/MHWEquipmentManagerComponent.h"
+#include "GameFramework/PlayerState.h"
 #include "Input/MHWInputComponent.h"
+#include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCharacter)
 
@@ -81,6 +83,16 @@ void AMHWCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		MHWPawnExtensionComponent->SetIsInput(true);
 		MHWPawnExtensionComponent->CheckInitialization();
 	}
+}
+
+UAbilitySystemComponent* AMHWCharacter::GetAbilitySystemComponent() const
+{
+	AMHWPlayerState* PS = GetPlayerState<AMHWPlayerState>();
+	if (PS)
+	{
+		return PS->GetAbilitySystemComponent();
+	}
+	return nullptr;
 }
 
 

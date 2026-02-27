@@ -17,7 +17,7 @@ struct FMHWStateTreeTask_RemoveTag_InstanceData
 	GENERATED_BODY()
 
 	// [输入] 绑定上下文中的 Actor（比如主角）
-	UPROPERTY(EditAnywhere, Category = "Input")
+	UPROPERTY(EditAnywhere, Category = "Context")
 	TObjectPtr<AActor> ContextActor;
 
 	// [参数] 你要在面板上配置的 Tag
@@ -28,8 +28,8 @@ struct FMHWStateTreeTask_RemoveTag_InstanceData
 // ==========================================
 // 第二部分：定义逻辑结构 (真正的 Task)
 // ==========================================
-USTRUCT(meta = (DisplayName = "Remove Gameplay Tag (C++)")) // 填你在编辑器里想看到的名字
-struct FMHWStateTreeTask_RemoveTag : public FStateTreeTaskBase
+USTRUCT(meta = (DisplayName = "STT Remove Gameplay Tag (C++)")) // 填你在编辑器里想看到的名字
+struct PMHW_API FMHWStateTreeTask_RemoveTag : public FStateTreeTaskCommonBase
 {
 	GENERATED_BODY()
 
@@ -38,28 +38,6 @@ struct FMHWStateTreeTask_RemoveTag : public FStateTreeTaskBase
 	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
 
 	// 核心逻辑：进入状态时执行
-	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override
-	{
-		// 1. 获取当前节点的数据实例
-		FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
-
-		// 2. 获取绑定的 Actor
-		
-		if (!InstanceData.ContextActor)
-		{
-			return EStateTreeRunStatus::Failed;
-		}
-
-		// 3. 拿到 ASC 并移除 Tag
-		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(InstanceData.ContextActor))
-		{
-			if (InstanceData.TagToRemove.IsValid())
-			{
-				ASC->RemoveLooseGameplayTag(InstanceData.TagToRemove);
-			}
-			return EStateTreeRunStatus::Succeeded; // 执行成功！
-		}
-
-		return EStateTreeRunStatus::Failed;
-	}
+	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+	
 };
