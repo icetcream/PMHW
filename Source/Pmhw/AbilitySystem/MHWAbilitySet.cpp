@@ -1,8 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AbilitySystem/MHWAbilitySet.h"
+#include "MHWAbilitySet.h"
 
-#include "AbilitySystem/Abilities/MHWGameplayAbility.h"
+#include "Abilities/MHWGameplayAbility.h"
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "MHWLogChannels.h"
 

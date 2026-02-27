@@ -4,11 +4,8 @@
 
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
-#include "AbilitySystemInterface.h"
-#include "Character/MHWCharacter.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
-#include "GameFramework/Character.h"
 #include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentManagerComponent)

@@ -17,7 +17,7 @@ public class Pmhw : ModuleRules
 
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				Path.Combine(ModuleDirectory, "Private")
+				ModuleDirectory
 			}
 		);
 		PublicDependencyModuleNames.AddRange(
