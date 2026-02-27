@@ -41,26 +41,24 @@ void AMHWCharacter::BeginPlay()
 	{
 		MHWPawnExtensionComponent->CheckInitialization();
 	}
-	/*// 场景：观察堆内存的重新分配
-	UE_LOG(LogTemp, Warning, TEXT("=== 测试默认分配器 ==="));
+}
 
-	TArray<int32> HeapArray; // 默认 FDefaultAllocator
-
-	// 打印初始状态
-	UE_LOG(LogTemp, Log, TEXT("Start: Ptr=%p, Num=%d, Max=%d"), HeapArray.GetData(), HeapArray.Num(), HeapArray.Max());
-
-	// 逐步添加元素，观察指针变化
-	for (int32 i = 0; i < 10; ++i)
+void AMHWCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	/*if (GetMesh() && GetMesh()->GetAnimInstance())
 	{
-		int32* OldPtr = HeapArray.GetData();
-		HeapArray.Add(i);
-		int32* NewPtr = HeapArray.GetData();
+		// 直接从源头（AnimInstance）抓取这一帧提取到的 Root Motion
+		FRootMotionMovementParams ExtractedRootMotion = GetMesh()->GetAnimInstance()->ConsumeExtractedRootMotion(1.0f); // 注意：Consume 会清空数据，仅供 Debug 测试！
+        
+		// 注意！上面的 Consume 会导致真正的移动失效（因为被你偷吃掉了）
+		// 所以这个方法只能用来“看有没有数据”，看完你的角色肯定动不了了。
+		// 测完记得删掉。ss
 
-		// 如果指针变了，说明发生了 Realloc（搬家）
-		if (OldPtr != NewPtr)
+		if (!ExtractedRootMotion.GetRootMotionTransform().GetRotation().IsIdentity())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Trigger Realloc! Index: %d | Old: %p -> New: %p | Capacity: %d"), 
-				i, OldPtr, NewPtr, HeapArray.Max());
+			GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Red, 
+				FString::Printf(TEXT("AnimInstance 产出了旋转: %s"), *ExtractedRootMotion.GetRootMotionTransform().GetRotation().Rotator().ToString()));
 		}
 	}*/
 }

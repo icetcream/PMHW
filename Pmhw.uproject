@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.4",
+	"EngineAssociation": "{6DA49D29-493B-6D6A-F52B-C1AAF14CB275}",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -51,6 +51,10 @@
 		},
 		{
 			"Name": "RuntimeTests",
+			"Enabled": true
+		},
+		{
+			"Name": "MotionWarping",
 			"Enabled": true
 		}
 	]

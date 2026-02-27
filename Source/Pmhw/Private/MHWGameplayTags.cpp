@@ -10,6 +10,7 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Look_Stick, "InputTag.Look_Stick");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Crouch, "InputTag.Crouch");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_AutoRun, "InputTag.AutoRun");
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_ToggleDraw, "InputTag.Weapon.ToggleDraw");
 
 
 	// --- 初始化阶段 ---
@@ -23,13 +24,16 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_SecondaryAttack, "InputTag.Ability.Secondary");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Interact, "InputTag.Interact");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Tackle, "InputTag.Ability.Tackle");
+	*/
 
 	// --- State ---
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Sheathed, "State.Weapon.Sheathed");
-	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Unsheathed, "State.Weapon.Unsheathed");
-	UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging, "State.Combat.Charging");
+	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Drawn, "State.Weapon.Drawn");
+	UE_DEFINE_GAMEPLAY_TAG(State_CanMove, "State.CanMove");
+	/*UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging, "State.Combat.Charging");
 	UE_DEFINE_GAMEPLAY_TAG(State_Combat_HitPause, "State.Combat.HitPause");
 
 	// --- Ability ---
 	UE_DEFINE_GAMEPLAY_TAG(Ability_GreatSword_Charge, "Ability.Weapon.GS.Charge");*/
+	
 }

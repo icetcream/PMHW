@@ -25,6 +25,9 @@ public:
 	const T* GetPawnData() const { return Cast<T>(PawnData); }
 	
 	void SetPawnData(const UMHWPawnData* InPawnData);
+	
+	UFUNCTION(BlueprintPure, Category = "MHW|Pawn")
+	UMHWAbilitySystemComponent* GetLyraAbilitySystemComponent() const { return AbilitySystemComponent; }
 
 	void SetIsInput(bool isInput);
 	
@@ -61,6 +64,7 @@ protected:
 	TObjectPtr<UMHWAbilitySystemComponent> AbilitySystemComponent;
 
 	bool bIsInputSet = false;
+	
 };
 
 

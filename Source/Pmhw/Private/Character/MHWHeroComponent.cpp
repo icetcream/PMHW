@@ -5,6 +5,7 @@
 
 #include "EnhancedInputSubsystems.h"
 #include "MHWGameplayTags.h"
+#include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "Character/MHWPawnData.h"
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Input/MHWInputComponent.h"
@@ -67,13 +68,13 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 				if (ensureMsgf(MHWIC, TEXT("Unexpected Input Component class! The Gameplay Abilities will not be bound to their inputs. Change the input component to UMHWInputComponent or a subclass of it.")))
 				{
 					// Add the key mappings that may have been set by the player
-					MHWIC->AddInputMappings(InputConfig, Subsystem);
+					/*MHWIC->AddInputMappings(InputConfig, Subsystem);*/
 
 					// This is where we actually bind and input action to a gameplay tag, which means that Gameplay Ability Blueprints will
 					// be triggered directly by these input actions Triggered events.
 		
-					//TArray<uint32> BindHandles;
-					//MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
+					TArray<uint32> BindHandles;
+					MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
 
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
@@ -134,6 +135,38 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 			}
 		}*/
 	}
+}
+
+void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
+{
+	if (const APawn* Pawn = GetPawn<APawn>())
+	{
+		if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+		{
+			if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetLyraAbilitySystemComponent())
+			{
+				MHWASC->AbilityInputTagPressed(InputTag);
+			}
+		}	
+	}
+}
+
+void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
+{
+	const APawn* Pawn = GetPawn<APawn>();
+	if (!Pawn)
+	{
+		return;
+	}
+
+	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+	{
+		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetLyraAbilitySystemComponent())
+		{
+			MHWASC->AbilityInputTagReleased(InputTag);
+		}
+	}	
+	
 }
 
 void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)

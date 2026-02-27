@@ -17,6 +17,22 @@ void UMHWAbilitySystemComponent::ClearAbilityInput()
 	InputHeldSpecHandles.Reset();
 }
 
+void UMHWAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)
+{
+	if (InputTag.IsValid())
+	{
+		AddLooseGameplayTag(InputTag);
+	}
+}
+
+void UMHWAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& InputTag)
+{
+	if (InputTag.IsValid())
+	{
+		RemoveLooseGameplayTag(InputTag);
+	}
+}
+
 
 
 

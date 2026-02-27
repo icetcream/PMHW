@@ -8,6 +8,7 @@
 
 class UEnhancedInputLocalPlayerSubsystem;
 
+//原本是IA绑定FUNCTION，多一层实现Tag对于FUNCTION
 UCLASS(Config = Input)
 class PMHW_API UMHWInputComponent : public UEnhancedInputComponent
 {
@@ -54,7 +55,7 @@ void UMHWInputComponent::BindAbilityActions(const UMHWInputConfig* InputConfig, 
 			{
 				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Triggered, Object, PressedFunc, Action.InputTag).GetHandle());
 			}
-
+			
 			if (ReleasedFunc)
 			{
 				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Completed, Object, ReleasedFunc, Action.InputTag).GetHandle());

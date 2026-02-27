@@ -16,8 +16,10 @@ public:
 	// Sets default values for this component's properties
 	UMHWAbilitySystemComponent();
 	
-	
 	void ClearAbilityInput();
+	
+	void AbilityInputTagPressed(const FGameplayTag& InputTag);
+	void AbilityInputTagReleased(const FGameplayTag& InputTag);
 
 protected:
 	// Handles to abilities that had their input pressed this frame.

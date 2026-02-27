@@ -4,8 +4,12 @@
 
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
+#include "AbilitySystemInterface.h"
+#include "Character/MHWCharacter.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
+#include "GameFramework/Character.h"
+#include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentManagerComponent)
 
@@ -118,6 +122,14 @@ void UMHWEquipmentManagerComponent::UnequipItem(UMHWEquipmentInstance* ItemInsta
 	}
 }
 
+void UMHWEquipmentManagerComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	GetPlayerState<AMHWPlayerState>()->GetAbilitySystemComponent()->RegisterGameplayTagEvent(
+		FGameplayTag::RequestGameplayTag(FName("State.Weapon.Drawn")),
+		EGameplayTagEventType::NewOrRemoved
+	).AddUObject(this, &UMHWEquipmentManagerComponent::OnWeaponDrawnStateChanged);
+}
 
 
 void UMHWEquipmentManagerComponent::InitializeComponent()
@@ -175,6 +187,30 @@ TArray<UMHWEquipmentInstance*> UMHWEquipmentManagerComponent::GetEquipmentInstan
 		}
 	}
 	return Results;
+}
+
+void UMHWEquipmentManagerComponent::OnWeaponDrawnStateChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	bool bIsDrawn = (NewCount > 0);
+	
+    
+	if (bIsDrawn)
+	{
+		UMHWEquipmentInstance* Weapon = GetFirstInstanceOfType(UAnimInstance::StaticClass());
+		TArray<AActor*> SpawnActors = Weapon->GetSpawnedActors();
+		if (SpawnActors.IsEmpty()) return;
+		Weapon->GetSpawnedActors()[0]->AttachToActor(Weapon->GetPawn(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Hand_R_Socket"));
+		// 链接战斗动画层
+		/*GetPawn<ACharacter>()->GetMesh()->LinkAnimClassLayers(Weapon);*/
+	}
+	else
+	{
+		// 收刀了！
+		// 挂载回后背
+		/*WeaponMesh->AttachToComponent(CharacterMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Back_Socket"));
+		// 断开战斗动画层，恢复空手
+		CharacterMesh->UnlinkAnimClassLayers(WeaponAnimLayerClass);*/
+	}
 }
 
 
