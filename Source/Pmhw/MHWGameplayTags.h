@@ -30,6 +30,12 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Weapon_Drawn);  // 拔刀
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_CanMove);
 	
+	// --- Msg locomotion
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Idle);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_StartMove);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Stop);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Pivot);
+	
 	
 	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging);    // 蓄力中

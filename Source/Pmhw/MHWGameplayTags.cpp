@@ -30,8 +30,17 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Sheathed, "State.Weapon.Sheathed");
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Drawn, "State.Weapon.Drawn");
 	UE_DEFINE_GAMEPLAY_TAG(State_CanMove, "State.CanMove");
+	
+	// --- Msg ---
+	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Idle, "Msg.Locomotion.Idle");
+	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_StartMove, "Msg.Locomotion.StartMove");
+	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Stop, "Msg.Locomotion.Stop");
+	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Pivot, "Msg.Locomotion.Pivot");
 	/*UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging, "State.Combat.Charging");
 	UE_DEFINE_GAMEPLAY_TAG(State_Combat_HitPause, "State.Combat.HitPause");
+	
+	
+	
 
 	// --- Ability ---
 	UE_DEFINE_GAMEPLAY_TAG(Ability_GreatSword_Charge, "Ability.Weapon.GS.Charge");*/
