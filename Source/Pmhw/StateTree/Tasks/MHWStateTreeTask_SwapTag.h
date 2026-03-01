@@ -44,37 +44,6 @@ struct PMHW_API FMHWStateTreeTask_SwapTag : public FStateTreeTaskCommonBase
 	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
 
 	// 核心逻辑：当 StateTree 进入这个节点时执行
-	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override
-	{
-		// 1. 获取当前节点独有的数据实例 (拿到面板上填的参数)
-		FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
-
-		// 2. 解析绑定的 Context Actor
-		if (!InstanceData.ContextActor)
-		{
-			// 如果没拿到主角，任务失败
-			return EStateTreeRunStatus::Failed;
-		}
-
-		// 3. 从主角身上获取 Ability System Component (ASC)
-		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(InstanceData.ContextActor))
-		{
-			// 4. 如果配置了要移除的 Tag，就撕掉它
-			if (InstanceData.TagToRemove.IsValid())
-			{
-				ASC->RemoveLooseGameplayTag(InstanceData.TagToRemove);
-			}
-
-			// 5. 如果配置了要添加的 Tag，就贴上它
-			if (InstanceData.TagToAdd.IsValid())
-			{
-				ASC->AddLooseGameplayTag(InstanceData.TagToAdd);
-			}
-
-			// 6. 全部执行完毕，向上级汇报成功！
-			return EStateTreeRunStatus::Succeeded; 
-		}
-
-		return EStateTreeRunStatus::Failed;
-	}
+	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+	
 };

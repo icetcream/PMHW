@@ -21,7 +21,12 @@ void UMHWAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Inpu
 {
 	if (InputTag.IsValid())
 	{
-		AddLooseGameplayTag(InputTag);
+		if (!HasMatchingGameplayTag(InputTag))
+		{
+			AddLooseGameplayTag(InputTag);
+			// 可选：打个日志看看是不是只加了一次
+			// UE_LOG(LogTemp, Log, TEXT("✅ 成功添加 InputTag: %s"), *InputTag.ToString());
+		}
 	}
 }
 
@@ -29,7 +34,11 @@ void UMHWAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& Inp
 {
 	if (InputTag.IsValid())
 	{
-		RemoveLooseGameplayTag(InputTag);
+		if (HasMatchingGameplayTag(InputTag))
+		{
+			RemoveLooseGameplayTag(InputTag);
+			// UE_LOG(LogTemp, Log, TEXT("❌ 成功移除 InputTag: %s"), *InputTag.ToString());
+		}
 	}
 }
 
