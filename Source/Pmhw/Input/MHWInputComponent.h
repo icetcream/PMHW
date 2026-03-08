@@ -28,6 +28,26 @@ public:
 	void BindAbilityActions(const UMHWInputConfig* InputConfig, UserClass* Object, PressedFuncType PressedFunc, ReleasedFuncType ReleasedFunc, TArray<uint32>& BindHandles);
 
 	void RemoveBinds(TArray<uint32>& BindHandles);
+	
+	UFUNCTION(BlueprintCallable, Category = "Locomotion|Input")
+	FVector GetSmoothInputDirection() const { return SmoothInputDirection; }
+
+	/**
+	 * 
+	 * @param TargetDirection 玩家摇杆当前实际推的纯粹方向 (期望方向)
+	 * @param InterpSpeed 平滑速度 (值越小，角色转身越沉重；值越大，转身越灵敏)
+	 * @param DeltaTime 帧时间
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Locomotion|Input")
+	void UpdateSmoothInput(FVector TargetDirection, float InterpSpeed, float DeltaTime);
+
+	UFUNCTION(BlueprintCallable, Category = "Locomotion|Input")
+	void ResetSmoothInput(FVector NewDirection) { SmoothInputDirection = NewDirection.GetSafeNormal2D(); }
+	
+	FVector RawMoveInput = FVector::ZeroVector;
+	
+private:
+	FVector SmoothInputDirection = FVector::ZeroVector;
 };
 
 

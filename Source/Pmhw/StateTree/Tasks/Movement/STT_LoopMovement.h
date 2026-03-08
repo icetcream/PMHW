@@ -21,9 +21,12 @@ struct FSTT_LoopMovement_InstanceData
 
 	UPROPERTY(EditAnywhere, Category = "Parameter")
 	float MaxAcceleration = 2000.0f;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Parameter")
+	bool bIsPivot = false;
 };
 
-USTRUCT(meta = (DisplayName = "Loop Movement Task"))
+USTRUCT(meta = (DisplayName = "Loop Movement"), Category = "Locomotion")
 struct FSTT_LoopMovement : public FStateTreeTaskCommonBase
 {
 	GENERATED_BODY()
@@ -32,4 +35,12 @@ struct FSTT_LoopMovement : public FStateTreeTaskCommonBase
 	virtual const UStruct* GetInstanceDataType() const override { return FSTT_LoopMovement_InstanceData::StaticStruct(); }
 
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+	
+	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
+	
+	float SteeringInterpSpeed = 1000.0f;
+	
+	float SpeedInterpSpeed = 1000.0f;
+	
+	bool bCanCheckPivot = true;
 };

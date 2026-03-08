@@ -4,14 +4,20 @@
 
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
+#include "EnhancedInputSubsystemInterface.h"
+#include "EnhancedInputSubsystems.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
+#include "Player/MHWLocalPlayer.h"
 #include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentManagerComponent)
 
 //////////////////////////////////////////////////////////////////////
 // FMHWAppliedEquipmentEntry
+
+class UEnhancedInputLocalPlayerSubsystem;
+class UMHWLocalPlayer;
 
 FString FMHWAppliedEquipmentEntry::GetDebugString() const
 {
@@ -60,7 +66,6 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 	}
 
 	Result->SpawnEquipmentActors(EquipmentCDO->ActorsToSpawn);
-
 	return Result;
 }
 

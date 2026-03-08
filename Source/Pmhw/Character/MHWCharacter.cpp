@@ -96,4 +96,9 @@ UAbilitySystemComponent* AMHWCharacter::GetAbilitySystemComponent() const
 	return nullptr;
 }
 
+const UMHWEquipmentManagerComponent* AMHWCharacter::GetEquipmentManagerComponent()
+{
+	return MHWEquipmentManagerComponent;
+}
+
 

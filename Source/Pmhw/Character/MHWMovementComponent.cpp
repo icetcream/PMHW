@@ -1,10 +1,18 @@
 ﻿#include "MHWMovementComponent.h"
 
+#include "Components/StateTreeComponent.h"
+#include "GameFramework/Character.h"
+
 UMHWMovementComponent::UMHWMovementComponent()
 {
 	// 可以在这里修改默认的物理参数，比如把地面的默认摩擦力调高
 	GroundFriction = 8.0f; 
 	MaxAcceleration = 2000.0f;
+}
+
+void UMHWMovementComponent::BeginPlay()
+{
+	Super::BeginPlay();
 }
 
 bool UMHWMovementComponent::CalculateIsInPivot(FVector VelocityDirection, FVector DesiredDirection) const
@@ -23,3 +31,4 @@ bool UMHWMovementComponent::CalculateIsInPivot(FVector VelocityDirection, FVecto
 	// 你可以把 -0.5 提取成一个变量，暴露给策划去调手感
 	return DotResult < -0.5f; 
 }
+

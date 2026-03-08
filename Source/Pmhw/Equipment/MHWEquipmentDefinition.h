@@ -6,6 +6,7 @@
 
 #include "MHWEquipmentDefinition.generated.h"
 
+class UInputMappingContext;
 class AActor;
 class UMHWAbilitySet;
 class UMHWEquipmentInstance;

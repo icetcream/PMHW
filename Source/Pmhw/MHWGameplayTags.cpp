@@ -11,6 +11,10 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Crouch, "InputTag.Crouch");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_AutoRun, "InputTag.AutoRun");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_ToggleDraw, "InputTag.Weapon.ToggleDraw");
+	
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_PrimaryAttack, "InputTag.Ability.Primary");
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_SecondaryAttack, "InputTag.Ability.Secondary");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
 
 
 	// --- 初始化阶段 ---
@@ -20,8 +24,7 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(InitState_GameplayReady, "InitState.GameplayReady");
 	
 	/*
-	UE_DEFINE_GAMEPLAY_TAG(InputTag_PrimaryAttack, "InputTag.Ability.Primary");
-	UE_DEFINE_GAMEPLAY_TAG(InputTag_SecondaryAttack, "InputTag.Ability.Secondary");
+	
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Interact, "InputTag.Interact");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Tackle, "InputTag.Ability.Tackle");
 	*/
@@ -34,6 +37,7 @@ namespace MHWTags
 	// --- Msg ---
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Idle, "Msg.Locomotion.Idle");
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_StartMove, "Msg.Locomotion.StartMove");
+	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_RunLoop, "Msg.Locomotion.RunLoop");
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Stop, "Msg.Locomotion.Stop");
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Pivot, "Msg.Locomotion.Pivot");
 	/*UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging, "State.Combat.Charging");

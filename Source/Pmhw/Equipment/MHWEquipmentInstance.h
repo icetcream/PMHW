@@ -13,6 +13,8 @@ class APawn;
 struct FFrame;
 struct FMHWEquipmentActorToSpawn;
 
+
+
 /**
  * UMHWEquipmentInstance
  *
@@ -44,7 +46,11 @@ public:
 	APawn* GetTypedPawn(TSubclassOf<APawn> PawnType) const;
 
 	UFUNCTION(BlueprintPure, Category=Equipment)
-	TArray<AActor*> GetSpawnedActors() const { return SpawnedActors; }
+	AActor* GetSpawnedActors() const { return SpawnedActor; }
+	
+	UFUNCTION(BlueprintCallable, Category=Equipment)
+	void UpdateAttachment(FName NewSocketName);
+	
 
 	virtual void SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn);
 	virtual void DestroyEquipmentActors();
@@ -60,13 +66,12 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category=Equipment, meta=(DisplayName="OnUnequipped"))
 	void K2_OnUnequipped();
 
-
-
 private:
 	UPROPERTY()
 	TObjectPtr<UObject> Instigator;
 
 	UPROPERTY()
-	TArray<TObjectPtr<AActor>> SpawnedActors;
+	TObjectPtr<AActor> SpawnedActor;
+	
 };
 

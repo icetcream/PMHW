@@ -5,6 +5,7 @@
 #include "GameFramework/Character.h"
 #include "STT_StartMovement.generated.h"
 
+class UControllerInputEvaluatorModel;
 // ==========================================
 // 数据篮子 (Instance Data)
 // ==========================================
@@ -14,8 +15,8 @@ struct FSTT_StartMovement_InstanceData
 	GENERATED_BODY()
 
 	// 【上下文】我们要操作的角色
-	UPROPERTY(EditAnywhere, Category = "Context")
-	TObjectPtr<ACharacter> Character = nullptr;
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UControllerInputEvaluatorModel> InputEvaluatorModel = nullptr;
 
 	// 【输出】计算出的极其精确的运动夹角（-180 到 180），给动画蓝图用！
 	UPROPERTY(EditAnywhere, Category = "Output")

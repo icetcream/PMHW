@@ -77,6 +77,7 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 					MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
 
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Completed, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Stick, ETriggerEvent::Triggered, this, &ThisClass::Input_LookStick, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
@@ -184,7 +185,10 @@ void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)
 	{
 		const FVector2D Value = InputActionValue.Get<FVector2D>();
 		const FRotator MovementRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
-
+		
+		UMHWInputComponent* MHWInputComp = GetMHWInputComponent();
+		MHWInputComp->RawMoveInput = MovementRotation.RotateVector(FVector(Value.X, Value.Y, 0.f));
+		
 		if (Value.X != 0.0f)
 		{
 			const FVector MovementDirection = MovementRotation.RotateVector(FVector::RightVector);
@@ -264,5 +268,15 @@ void UMHWHeroComponent::Input_AutoRun(const FInputActionValue& InputActionValue)
 			Controller->SetIsAutoRunning(!Controller->GetIsAutoRunning());
 		}	
 	}*/
+}
+
+UMHWInputComponent* UMHWHeroComponent::GetMHWInputComponent()
+{
+	if (!IsValid(InputComp))
+	{
+		UMHWInputComponent* MHWInputComp = Cast<UMHWInputComponent>(GetPawn<APawn>()->GetComponentByClass(UMHWInputComponent::StaticClass()));
+		InputComp = MHWInputComp;
+	}
+	return InputComp;
 }
 

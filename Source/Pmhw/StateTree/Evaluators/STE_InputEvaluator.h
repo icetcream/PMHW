@@ -20,6 +20,18 @@ struct FSTE_InputEvaluator_InstanceData
 	// ✨【输出】这就是我们建好的数据仓库，暴露给所有 Task 使用！
 	UPROPERTY(EditAnywhere, Category = "Output")
 	TObjectPtr<UControllerInputEvaluatorModel> EvaluatorModel = nullptr;
+	
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bHasMovementInput = false;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bIsFalling = false;
+	
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bHasVelocity = false;
+	
+	UPROPERTY(EditAnywhere, Category = "Output")
+	float GroundVelocity = 0.f;
 };
 
 // ==========================================

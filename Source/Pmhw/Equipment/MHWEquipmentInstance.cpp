@@ -3,8 +3,10 @@
 
 #include "Equipment/MHWEquipmentInstance.h"
 
+#include "EnhancedInputSubsystems.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "GameFramework/Character.h"
+#include "Player/MHWLocalPlayer.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentInstance)
 
@@ -49,6 +51,19 @@ APawn* UMHWEquipmentInstance::GetTypedPawn(TSubclassOf<APawn> PawnType) const
 	return Result;
 }
 
+void UMHWEquipmentInstance::UpdateAttachment(FName NewSocketName)
+{
+	if (SpawnedActor)
+	{
+		// 获取 Character 的 Mesh
+		USkeletalMeshComponent* AttachTarget = Cast<USkeletalMeshComponent>(GetPawn()->GetRootComponent());
+        
+		// 执行 Attach
+		FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
+		SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, NewSocketName);
+	}
+}
+
 void UMHWEquipmentInstance::SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn)
 {
 	if (APawn* OwningPawn = GetPawn())
@@ -61,25 +76,21 @@ void UMHWEquipmentInstance::SpawnEquipmentActors(const TArray<FMHWEquipmentActor
 
 		for (const FMHWEquipmentActorToSpawn& SpawnInfo : ActorsToSpawn)
 		{
-			AActor* NewActor = GetWorld()->SpawnActorDeferred<AActor>(SpawnInfo.ActorToSpawn, FTransform::Identity, OwningPawn);
-			NewActor->FinishSpawning(FTransform::Identity, /*bIsDefaultTransform=*/ true);
-			NewActor->SetActorRelativeTransform(SpawnInfo.AttachTransform);
-			NewActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, SpawnInfo.AttachSocket);
-
-			SpawnedActors.Add(NewActor);
+			SpawnedActor = GetWorld()->SpawnActorDeferred<AActor>(SpawnInfo.ActorToSpawn, FTransform::Identity, OwningPawn);
+			SpawnedActor->FinishSpawning(FTransform::Identity, /*bIsDefaultTransform=*/ true);
+			SpawnedActor->SetActorRelativeTransform(SpawnInfo.AttachTransform);
+			SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, SpawnInfo.AttachSocket);
+			
 		}
 	}
 }
 
 void UMHWEquipmentInstance::DestroyEquipmentActors()
 {
-	for (AActor* Actor : SpawnedActors)
-	{
-		if (Actor)
+		if (SpawnedActor)
 		{
-			Actor->Destroy();
+			SpawnedActor->Destroy();
 		}
-	}
 }
 
 void UMHWEquipmentInstance::OnEquipped()

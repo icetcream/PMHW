@@ -33,6 +33,7 @@ namespace MHWTags
 	// --- Msg locomotion
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Idle);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_StartMove);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_RunLoop);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Stop);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Pivot);
 	

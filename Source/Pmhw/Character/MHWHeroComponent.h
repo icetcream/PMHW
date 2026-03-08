@@ -9,6 +9,7 @@
 #include "MHWHeroComponent.generated.h"
 
 
+class UMHWInputComponent;
 class UInputMappingContext;
 class UMHWInputConfig;
 class UInputComponent;
@@ -59,9 +60,12 @@ protected:
 	void Input_LookStick(const FInputActionValue& InputActionValue);
 	void Input_Crouch(const FInputActionValue& InputActionValue);
 	void Input_AutoRun(const FInputActionValue& InputActionValue);
+	
+	UMHWInputComponent* GetMHWInputComponent();
 
 	UPROPERTY(EditDefaultsOnly, Category = "MHW|Input")
 	TArray<FInputMappingContextAndPriority> DefaultInputMappings;
 private:
-	
+	UPROPERTY()
+	TObjectPtr<UMHWInputComponent> InputComp;
 };
