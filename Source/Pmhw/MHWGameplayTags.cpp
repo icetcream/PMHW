@@ -1,5 +1,9 @@
 ﻿#include "MHWGameplayTags.h"
 
+#define DEFINE_INPUT_TAG_SET(BaseVar, TagPath) \
+UE_DEFINE_GAMEPLAY_TAG(BaseVar, TagPath); \
+UE_DEFINE_GAMEPLAY_TAG(BaseVar##_Hold, TagPath TEXT(".Hold")); \
+UE_DEFINE_GAMEPLAY_TAG(BaseVar##_Completed, TagPath TEXT(".Completed"));
 namespace MHWTags
 {
 	// 宏语法：UE_DEFINE_GAMEPLAY_TAG(变量名, "标签.字符串")
@@ -10,12 +14,10 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Look_Stick, "InputTag.Look_Stick");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Crouch, "InputTag.Crouch");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_AutoRun, "InputTag.AutoRun");
-	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_ToggleDraw, "InputTag.Weapon.ToggleDraw");
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_ToggleDraw, "InputTag.ToggleDraw");
 	
-	UE_DEFINE_GAMEPLAY_TAG(InputTag_PrimaryAttack, "InputTag.Ability.Primary");
-	UE_DEFINE_GAMEPLAY_TAG(InputTag_SecondaryAttack, "InputTag.Ability.Secondary");
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
-
+	DEFINE_INPUT_TAG_SET(InputTag_PrimaryAttack, "InputTag.PrimaryAttack");
+	DEFINE_INPUT_TAG_SET(InputTag_SecondaryAttack, "InputTag.SecondaryAttack");
 
 	// --- 初始化阶段 ---
 	UE_DEFINE_GAMEPLAY_TAG(InitState_Spawned, "InitState.Spawned");

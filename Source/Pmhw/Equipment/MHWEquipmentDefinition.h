@@ -55,4 +55,7 @@ public:
 	// Actors to spawn on the pawn when this is equipped
 	UPROPERTY(EditDefaultsOnly, Category=Equipment)
 	TArray<FMHWEquipmentActorToSpawn> ActorsToSpawn;
-};
+	
+	UPROPERTY(EditDefaultsOnly, Category=Equipment)
+	UInputMappingContext* InputMappingContext;
+};                                       

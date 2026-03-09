@@ -13,6 +13,7 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentManagerComponent)
 
+#define WEAPON_PRIORITY 1
 //////////////////////////////////////////////////////////////////////
 // FMHWAppliedEquipmentEntry
 
@@ -30,6 +31,15 @@ UMHWAbilitySystemComponent* FMHWEquipmentList::GetAbilitySystemComponent() const
 	check(OwnerComponent);
 	AActor* OwningActor = OwnerComponent->GetOwner();
 	return Cast<UMHWAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor));
+}
+
+APawn* FMHWEquipmentList::GetPawn()
+{
+	if (OwnerComponent)
+	{
+		return Cast<APawn>(OwnerComponent->GetOuter());
+	}
+	return nullptr;
 }
 
 UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefinition> EquipmentDefinition)
@@ -52,6 +62,16 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 	NewEntry.EquipmentDefinition = EquipmentDefinition;
 	NewEntry.Instance = NewObject<UMHWEquipmentInstance>(OwnerComponent->GetOwner(), InstanceType);  //@TODO: Using the actor instead of component as the outer due to UE-127172
 	Result = NewEntry.Instance;
+	
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem();
+	
+	if (UInputMappingContext* IMC = EquipmentCDO->InputMappingContext)
+	{
+		FModifyContextOptions Options = {};
+		Options.bIgnoreAllPressedKeysUntilRelease = false;
+		// Actually add the config to the local player							
+		Subsystem->AddMappingContext(IMC, WEAPON_PRIORITY, Options);
+	}
 
 	if (UMHWAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 	{
@@ -69,11 +89,20 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 	return Result;
 }
 
+
 void FMHWEquipmentList::RemoveEntry(UMHWEquipmentInstance* Instance)
 {
 	for (auto EntryIt = Entries.CreateIterator(); EntryIt; ++EntryIt)
 	{
 		FMHWAppliedEquipmentEntry& Entry = *EntryIt;
+		const UMHWEquipmentDefinition* EquipmentCDO = GetDefault<UMHWEquipmentDefinition>(Entry.EquipmentDefinition);
+
+		UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem();
+	
+		if (UInputMappingContext* IMC = EquipmentCDO->InputMappingContext)
+		{
+			Subsystem->RemoveMappingContext(IMC);
+		}
 		if (Entry.Instance == Instance)
 		{
 			if (UMHWAbilitySystemComponent* ASC = GetAbilitySystemComponent())
@@ -86,6 +115,23 @@ void FMHWEquipmentList::RemoveEntry(UMHWEquipmentInstance* Instance)
 			EntryIt.RemoveCurrent();
 		}
 	}
+}
+
+UEnhancedInputLocalPlayerSubsystem* FMHWEquipmentList::GetEnhancedInputSystem()
+{
+	if (EnhancedInputSubsystem == nullptr)
+	{
+		const APlayerController* PC = GetPawn()->GetController<APlayerController>();
+		check(PC);
+	
+		const UMHWLocalPlayer* LP = Cast<UMHWLocalPlayer>(PC->GetLocalPlayer());
+		check(LP);
+
+		UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+		check(Subsystem);
+		EnhancedInputSubsystem = Subsystem;
+	}
+	return EnhancedInputSubsystem;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -107,6 +153,7 @@ UMHWEquipmentInstance* UMHWEquipmentManagerComponent::EquipItem(TSubclassOf<UMHW
 	if (EquipmentClass != nullptr)
 	{
 		Result = EquipmentList.AddEntry(EquipmentClass);
+
 		if (Result != nullptr)
 		{
 			Result->OnEquipped();

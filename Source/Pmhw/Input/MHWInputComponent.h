@@ -24,8 +24,8 @@ public:
 	void BindNativeAction(const UMHWInputConfig* InputConfig, const FGameplayTag& InputTag, ETriggerEvent TriggerEvent, UserClass* Object, FuncType Func, bool bLogIfNotFound);
 	
 	// 按下按键 -> 发送 InputTag 给 GAS 组件 -> GAS 激活拥有该 Tag 的技能
-	template<class UserClass, typename PressedFuncType, typename ReleasedFuncType>
-	void BindAbilityActions(const UMHWInputConfig* InputConfig, UserClass* Object, PressedFuncType PressedFunc, ReleasedFuncType ReleasedFunc, TArray<uint32>& BindHandles);
+	template<class UserClass, typename PressedFuncType,typename HoldFuncType, typename ReleasedFuncType>
+	void BindAbilityActions(const UMHWInputConfig* InputConfig, UserClass* Object, PressedFuncType PressedFunc,HoldFuncType HoldFunc , ReleasedFuncType ReleasedFunc, TArray<uint32>& BindHandles);
 
 	void RemoveBinds(TArray<uint32>& BindHandles);
 	
@@ -62,8 +62,8 @@ void UMHWInputComponent::BindNativeAction(const UMHWInputConfig* InputConfig, co
 	}
 }
 
-template<class UserClass, typename PressedFuncType, typename ReleasedFuncType>
-void UMHWInputComponent::BindAbilityActions(const UMHWInputConfig* InputConfig, UserClass* Object, PressedFuncType PressedFunc, ReleasedFuncType ReleasedFunc, TArray<uint32>& BindHandles)
+template<class UserClass, typename PressedFuncType,typename HoldFuncType, typename ReleasedFuncType>
+void UMHWInputComponent::BindAbilityActions(const UMHWInputConfig* InputConfig, UserClass* Object, PressedFuncType PressedFunc, HoldFuncType HoldFunc ,ReleasedFuncType ReleasedFunc, TArray<uint32>& BindHandles)
 {
 	check(InputConfig);
 
@@ -73,6 +73,11 @@ void UMHWInputComponent::BindAbilityActions(const UMHWInputConfig* InputConfig, 
 		{
 			if (PressedFunc)
 			{
+				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Started, Object, PressedFunc, Action.InputTag).GetHandle());
+			}
+			
+			if (HoldFunc)
+			{
 				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Triggered, Object, PressedFunc, Action.InputTag).GetHandle());
 			}
 			
@@ -80,6 +85,7 @@ void UMHWInputComponent::BindAbilityActions(const UMHWInputConfig* InputConfig, 
 			{
 				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Completed, Object, ReleasedFunc, Action.InputTag).GetHandle());
 			}
+			
 		}
 	}
 }

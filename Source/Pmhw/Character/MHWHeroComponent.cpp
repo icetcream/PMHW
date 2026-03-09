@@ -8,10 +8,14 @@
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "Character/MHWPawnData.h"
 #include "Character/MHWPawnExtensionComponent.h"
+#include "Components/StateTreeComponent.h"
+#include "Data/InputActionMappingAsset.h"
 #include "Input/MHWInputComponent.h"
+#include "Interface/MHWCharacterInterface.h"
 #include "Player/MHWLocalPlayer.h"
 #include "Player/MHWPlayerController.h"
 #include "Player/MHWPlayerState.h"
+#include "Subsystems/ConfigManager.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWHeroComponent)
 
@@ -74,7 +78,7 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 					// be triggered directly by these input actions Triggered events.
 		
 					TArray<uint32> BindHandles;
-					MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
+					MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed,&ThisClass::Input_AbilityInputTagHold, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
 
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Completed, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
@@ -140,7 +144,7 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 
 void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
 {
-	if (const APawn* Pawn = GetPawn<APawn>())
+	if (APawn* Pawn = GetPawn<APawn>())
 	{
 		if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 		{
@@ -149,12 +153,56 @@ void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
 				MHWASC->AbilityInputTagPressed(InputTag);
 			}
 		}	
+		if (Pawn->Implements<UMHWCharacterInterface>())
+		{
+			UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn);
+			UConfigManager* ConfigSystem = Pawn->GetGameInstance()->GetSubsystem<UConfigManager>();
+			FInputActionTagSet OutInputTagSet;
+			if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
+				ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
+			{
+				if (OutInputTagSet.InputTag != FGameplayTag())
+				{
+					StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.InputTag));
+				}
+			}
+		}
+	}
+}
+void UMHWHeroComponent::Input_AbilityInputTagHold(FGameplayTag InputTag)
+{
+	APawn* Pawn = GetPawn<APawn>();
+	if (!Pawn)
+	{
+		return;
+	}
+
+	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+	{
+		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetLyraAbilitySystemComponent())
+		{
+			MHWASC->AbilityInputTagHolded(InputTag);
+		}
+	}	
+	if (Pawn->Implements<UMHWCharacterInterface>())
+	{
+		UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn);
+		UConfigManager* ConfigSystem = Pawn->GetGameInstance()->GetSubsystem<UConfigManager>();
+		FInputActionTagSet OutInputTagSet;
+		if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
+			ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
+		{
+			if (OutInputTagSet.HoldTag != FGameplayTag())
+			{
+				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.HoldTag));
+			}
+		}
 	}
 }
 
 void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
 {
-	const APawn* Pawn = GetPawn<APawn>();
+	APawn* Pawn = GetPawn<APawn>();
 	if (!Pawn)
 	{
 		return;
@@ -167,8 +215,24 @@ void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
 			MHWASC->AbilityInputTagReleased(InputTag);
 		}
 	}	
-	
+	if (Pawn->Implements<UMHWCharacterInterface>())
+	{
+		UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn);
+		UConfigManager* ConfigSystem = Pawn->GetGameInstance()->GetSubsystem<UConfigManager>();
+		FInputActionTagSet OutInputTagSet;
+		if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
+			ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
+		{
+			if (OutInputTagSet.CompleteTag != FGameplayTag())
+			{
+				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.CompleteTag));
+			}
+		}
+	}
 }
+
+
+
 
 void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)
 {

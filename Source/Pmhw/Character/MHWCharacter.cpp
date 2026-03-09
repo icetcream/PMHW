@@ -6,6 +6,7 @@
 #include "MHWGameplayTags.h"
 #include "MHWMovementComponent.h"
 #include "Character/MHWPawnExtensionComponent.h"
+#include "Components/StateTreeComponent.h"
 #include "Equipment/MHWEquipmentManagerComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/PlayerState.h"
@@ -21,6 +22,7 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 
 	MHWPawnExtensionComponent = CreateDefaultSubobject<UMHWPawnExtensionComponent>(TEXT("MHWPawnExtensionComponent"));
 	MHWEquipmentManagerComponent = CreateDefaultSubobject<UMHWEquipmentManagerComponent>(TEXT("MHWEquipmentManagerComponent"));
+	MHWStateTreeComponent = CreateDefaultSubobject<UStateTreeComponent>("MHWStateTreeComponent");
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -44,6 +46,7 @@ void AMHWCharacter::BeginPlay()
 	{
 		MHWPawnExtensionComponent->CheckInitialization();
 	}
+	
 }
 
 void AMHWCharacter::Tick(float DeltaSeconds)
@@ -96,9 +99,15 @@ UAbilitySystemComponent* AMHWCharacter::GetAbilitySystemComponent() const
 	return nullptr;
 }
 
-const UMHWEquipmentManagerComponent* AMHWCharacter::GetEquipmentManagerComponent()
+const UMHWEquipmentManagerComponent* AMHWCharacter::GetEquipmentManagerComponent_Implementation()
 {
 	return MHWEquipmentManagerComponent;
 }
+
+UStateTreeComponent* AMHWCharacter::GetStateTreeComponent_Implementation()
+{
+	return MHWStateTreeComponent;
+}
+
 
 

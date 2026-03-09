@@ -6,6 +6,7 @@
 #include "UObject/Interface.h"
 #include "MHWCharacterInterface.generated.h"
 
+class UStateTreeComponent;
 class UMHWEquipmentManagerComponent;
 // This class does not need to be modified.
 
@@ -22,7 +23,10 @@ class PMHW_API IMHWCharacterInterface
 public:
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Equipment")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MHW|Interface")
 	const UMHWEquipmentManagerComponent* GetEquipmentManagerComponent();
+	
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MHW|Interface")
+	UStateTreeComponent* GetStateTreeComponent();
 
 };

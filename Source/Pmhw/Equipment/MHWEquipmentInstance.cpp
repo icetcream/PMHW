@@ -56,11 +56,13 @@ void UMHWEquipmentInstance::UpdateAttachment(FName NewSocketName)
 	if (SpawnedActor)
 	{
 		// 获取 Character 的 Mesh
-		USkeletalMeshComponent* AttachTarget = Cast<USkeletalMeshComponent>(GetPawn()->GetRootComponent());
-        
-		// 执行 Attach
-		FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-		SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, NewSocketName);
+		if (ACharacter* MyCharacter = Cast<ACharacter>(GetPawn()))
+		{
+			USkeletalMeshComponent* AttachTarget = MyCharacter->GetMesh();
+			// 执行 Attach
+			FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
+			SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, NewSocketName);
+		}
 	}
 }
 

@@ -20,6 +20,8 @@ public:
 	
 	void AbilityInputTagPressed(const FGameplayTag& InputTag);
 	void AbilityInputTagReleased(const FGameplayTag& InputTag);
+	void AbilityInputTagHolded(const FGameplayTag& InputTag);
+
 
 protected:
 	// Handles to abilities that had their input pressed this frame.

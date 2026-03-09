@@ -53,6 +53,7 @@ protected:
 	// --- MHWPawnComponent End ---
 	
 	void Input_AbilityInputTagPressed(FGameplayTag InputTag);
+	void Input_AbilityInputTagHold(FGameplayTag InputTag);
 	void Input_AbilityInputTagReleased(FGameplayTag InputTag);
 	
 	void Input_Move(const FInputActionValue& InputActionValue);
@@ -60,6 +61,8 @@ protected:
 	void Input_LookStick(const FInputActionValue& InputActionValue);
 	void Input_Crouch(const FInputActionValue& InputActionValue);
 	void Input_AutoRun(const FInputActionValue& InputActionValue);
+	
+	void SendInputEventToStateTree(FGameplayTag InputTag, APawn* Pawn, FName SuffixName);
 	
 	UMHWInputComponent* GetMHWInputComponent();
 

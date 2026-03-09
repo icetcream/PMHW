@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EnhancedInputSubsystems.h"
 #include "AbilitySystem/MHWAbilitySet.h"
 #include "Character/MHWPawnComponent.h"
 #include "MHWEquipmentManagerComponent.generated.h"
@@ -62,6 +63,10 @@ public:
 
 private:
 	UMHWAbilitySystemComponent* GetAbilitySystemComponent() const;
+	
+	APawn* GetPawn();
+	
+	UEnhancedInputLocalPlayerSubsystem* GetEnhancedInputSystem();
 
 	friend UMHWEquipmentManagerComponent;
 
@@ -72,6 +77,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UActorComponent> OwnerComponent;
+	
+	UPROPERTY()
+	TObjectPtr<UEnhancedInputLocalPlayerSubsystem> EnhancedInputSubsystem;
 };
 
 

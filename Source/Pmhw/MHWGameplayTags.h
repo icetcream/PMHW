@@ -3,6 +3,10 @@
 #include "CoreMinimal.h"
 #include "NativeGameplayTags.h" 
 
+#define DECLARE_INPUT_TAG_SET(BaseName) \
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseName); \
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseName##_Hold); \
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseName##_Completed);
 
 namespace MHWTags
 {
@@ -20,8 +24,10 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_DataInitialized);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_GameplayReady);
 	
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_PrimaryAttack);   // 比如三角键
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_SecondaryAttack); // 比如圆圈键
+	DECLARE_INPUT_TAG_SET(InputTag_PrimaryAttack);   // 比如三角键
+	DECLARE_INPUT_TAG_SET(InputTag_SecondaryAttack); // 比如圆圈键
+
+	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Interact);        // 比如收刀/R1
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Tackle);          // 铁山靠
 
