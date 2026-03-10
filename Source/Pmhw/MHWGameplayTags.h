@@ -26,7 +26,7 @@ namespace MHWTags
 	
 	DECLARE_INPUT_TAG_SET(InputTag_PrimaryAttack);   // 比如三角键
 	DECLARE_INPUT_TAG_SET(InputTag_SecondaryAttack); // 比如圆圈键
-
+	DECLARE_INPUT_TAG_SET(InputTag_SpecialAction); // 组合按键
 	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Interact);        // 比如收刀/R1
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Tackle);          // 铁山靠

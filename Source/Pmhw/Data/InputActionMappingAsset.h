@@ -11,13 +11,13 @@ struct FInputActionTagSet
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag InputTag; // 原始输入标签 (如 Input.X)
+	FGameplayTag InputTag = FGameplayTag(); // 原始输入标签 (如 Input.X)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag HoldTag; // 蓄力标签 (如 Input.X.Hold)
+	FGameplayTag HoldTag = FGameplayTag(); // 蓄力标签 (如 Input.X.Hold)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag CompleteTag; // 完成标签 (如 Input.X.Completed)
+	FGameplayTag CompleteTag = FGameplayTag(); // 完成标签 (如 Input.X.Completed)
 };
 
 // Data Asset 类

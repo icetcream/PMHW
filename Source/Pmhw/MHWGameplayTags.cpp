@@ -18,6 +18,7 @@ namespace MHWTags
 	
 	DEFINE_INPUT_TAG_SET(InputTag_PrimaryAttack, "InputTag.PrimaryAttack");
 	DEFINE_INPUT_TAG_SET(InputTag_SecondaryAttack, "InputTag.SecondaryAttack");
+	DEFINE_INPUT_TAG_SET(InputTag_SpecialAction, "InputTag.SpecialAction");
 
 	// --- 初始化阶段 ---
 	UE_DEFINE_GAMEPLAY_TAG(InitState_Spawned, "InitState.Spawned");

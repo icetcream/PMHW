@@ -15,6 +15,7 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCharacter)
 
+
 AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UMHWMovementComponent>(ACharacter::CharacterMovementComponentName))
 {

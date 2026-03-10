@@ -1,8 +1,13 @@
 ﻿#include "MHWMovementComponent.h"
 
+#include "Components/CapsuleComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "GameFramework/Character.h"
-
+namespace MHWCharacter
+{
+	static float GroundTraceDistance = 100000.0f;
+	FAutoConsoleVariableRef CVar_GroundTraceDistance(TEXT("MHWCharacter.GroundTraceDistance"), GroundTraceDistance, TEXT("Distance to trace down when generating ground information."), ECVF_Cheat);
+}
 UMHWMovementComponent::UMHWMovementComponent()
 {
 	// 可以在这里修改默认的物理参数，比如把地面的默认摩擦力调高
@@ -30,5 +35,52 @@ bool UMHWMovementComponent::CalculateIsInPivot(FVector VelocityDirection, FVecto
 	// 阈值判断：如果点乘小于 -0.5（约等于夹角大于 120 度），判定为玩家猛拉了摇杆，触发急停！
 	// 你可以把 -0.5 提取成一个变量，暴露给策划去调手感
 	return DotResult < -0.5f; 
+}
+
+const FMHWCharacterGroundInfo& UMHWMovementComponent::GetGroundInfo()
+{
+	if (!CharacterOwner || (GFrameCounter == CachedGroundInfo.LastUpdateFrame))
+	{
+		return CachedGroundInfo;
+	}
+
+	if (MovementMode == MOVE_Walking)
+	{
+		CachedGroundInfo.GroundHitResult = CurrentFloor.HitResult;
+		CachedGroundInfo.GroundDistance = 0.0f;
+	}
+	else
+	{
+		const UCapsuleComponent* CapsuleComp = CharacterOwner->GetCapsuleComponent();
+		check(CapsuleComp);
+
+		const float CapsuleHalfHeight = CapsuleComp->GetUnscaledCapsuleHalfHeight();
+		const ECollisionChannel CollisionChannel = (UpdatedComponent ? UpdatedComponent->GetCollisionObjectType() : ECC_Pawn);
+		const FVector TraceStart(GetActorLocation());
+		const FVector TraceEnd(TraceStart.X, TraceStart.Y, (TraceStart.Z - MHWCharacter::GroundTraceDistance - CapsuleHalfHeight));
+
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LyraCharacterMovementComponent_GetGroundInfo), false, CharacterOwner);
+		FCollisionResponseParams ResponseParam;
+		InitCollisionParams(QueryParams, ResponseParam);
+
+		FHitResult HitResult;
+		GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, CollisionChannel, QueryParams, ResponseParam);
+
+		CachedGroundInfo.GroundHitResult = HitResult;
+		CachedGroundInfo.GroundDistance = MHWCharacter::GroundTraceDistance;
+
+		if (MovementMode == MOVE_NavWalking)
+		{
+			CachedGroundInfo.GroundDistance = 0.0f;
+		}
+		else if (HitResult.bBlockingHit)
+		{
+			CachedGroundInfo.GroundDistance = FMath::Max((HitResult.Distance - CapsuleHalfHeight), 0.0f);
+		}
+	}
+
+	CachedGroundInfo.LastUpdateFrame = GFrameCounter;
+
+	return CachedGroundInfo;
 }
 
