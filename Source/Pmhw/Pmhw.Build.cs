@@ -32,7 +32,9 @@ public class Pmhw : ModuleRules
 				"GameplayTags",
 				"GameplayTasks",
 				"StateTreeModule",
-				"GameplayStateTreeModule"
+				"GameplayStateTreeModule",
+				"AnimationModifiers",
+				"AnimationBlueprintLibrary"
 			}
 		);
 
