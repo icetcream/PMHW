@@ -29,10 +29,9 @@ namespace MHWTags
 	DECLARE_INPUT_TAG_SET(InputTag_SpecialAction); // 组合按键
 	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Interact);        // 比如收刀/R1
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Tackle);          // 铁山靠
 
 	// --- 状态相关标签 (State Tags) ---
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Weapon_Sheathed);    // 收刀
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_ComboWindow);    // 收刀
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Weapon_Drawn);  // 拔刀
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_CanMove);
 	
@@ -43,7 +42,7 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Stop);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Pivot);
 	
-	
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Animation_Complete);
 	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging);    // 蓄力中
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_HitPause);    // 卡肉中

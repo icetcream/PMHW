@@ -5,6 +5,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "GameplayTagContainer.h" // 需要包含 GameplayTags 模块
+#include "MHWComboPreInputComponent.h"
 #include "Interface/MHWCharacterInterface.h"
 #include "MHWCharacter.generated.h"
 
@@ -33,6 +34,7 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual const UMHWEquipmentManagerComponent* GetEquipmentManagerComponent_Implementation() override;
 	virtual UStateTreeComponent* GetStateTreeComponent_Implementation() override;
+	virtual UMHWComboPreInputComponent* GetComboPreInputComponent_Implementation() override;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
@@ -43,6 +45,9 @@ private:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStateTreeComponent> MHWStateTreeComponent;
+	
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMHWComboPreInputComponent> MHWComboPreInputComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	FGameplayTagContainer CurrentComboState;

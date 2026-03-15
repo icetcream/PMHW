@@ -24,6 +24,7 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	MHWPawnExtensionComponent = CreateDefaultSubobject<UMHWPawnExtensionComponent>(TEXT("MHWPawnExtensionComponent"));
 	MHWEquipmentManagerComponent = CreateDefaultSubobject<UMHWEquipmentManagerComponent>(TEXT("MHWEquipmentManagerComponent"));
 	MHWStateTreeComponent = CreateDefaultSubobject<UStateTreeComponent>("MHWStateTreeComponent");
+	MHWComboPreInputComponent = CreateDefaultSubobject<UMHWComboPreInputComponent>(TEXT("MHWComboPreInputComponent"));
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -108,6 +109,11 @@ const UMHWEquipmentManagerComponent* AMHWCharacter::GetEquipmentManagerComponent
 UStateTreeComponent* AMHWCharacter::GetStateTreeComponent_Implementation()
 {
 	return MHWStateTreeComponent;
+}
+
+UMHWComboPreInputComponent* AMHWCharacter::GetComboPreInputComponent_Implementation()
+{
+	return MHWComboPreInputComponent;
 }
 
 

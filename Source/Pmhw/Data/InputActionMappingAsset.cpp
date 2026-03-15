@@ -9,7 +9,7 @@ bool UInputActionMappingAsset::GetTagSetByInput(FGameplayTag InputTag, FInputAct
 {
 	for (const FInputActionTagSet& Set : ActionMappings)
 	{
-		if (Set.InputTag == InputTag)
+		if (Set.InputTag.Tag == InputTag)
 		{
 			OutTagSet = Set;
 			return true;

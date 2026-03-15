@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Character/MHWComboPreInputComponent.h"
 #include "UObject/Interface.h"
 #include "MHWCharacterInterface.generated.h"
 
@@ -28,5 +29,8 @@ public:
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MHW|Interface")
 	UStateTreeComponent* GetStateTreeComponent();
+	
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MHW|Interface")
+	UMHWComboPreInputComponent* GetComboPreInputComponent();
 
 };

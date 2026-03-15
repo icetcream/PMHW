@@ -78,7 +78,7 @@ void UMHWInputComponent::BindAbilityActions(const UMHWInputConfig* InputConfig, 
 			
 			if (HoldFunc)
 			{
-				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Triggered, Object, PressedFunc, Action.InputTag).GetHandle());
+				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Triggered, Object, HoldFunc, Action.InputTag).GetHandle());
 			}
 			
 			if (ReleasedFunc)

@@ -161,11 +161,13 @@ void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
 			if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
 				ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
 			{
-				if (OutInputTagSet.InputTag != FGameplayTag())
+				if (OutInputTagSet.InputTag.Tag != FGameplayTag())
 				{
-					StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.InputTag));
+					StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.InputTag.Tag));
 				}
 			}
+			UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(GetOuter());
+			PreInputComponent->BufferInput(OutInputTagSet.InputTag.Tag, OutInputTagSet.InputTag.Priority);
 		}
 	}
 }
@@ -192,11 +194,13 @@ void UMHWHeroComponent::Input_AbilityInputTagHold(FGameplayTag InputTag)
 		if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
 			ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
 		{
-			if (OutInputTagSet.HoldTag != FGameplayTag())
+			if (OutInputTagSet.HoldTag.Tag != FGameplayTag())
 			{
-				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.HoldTag));
+				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.HoldTag.Tag));
 			}
 		}
+		UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(GetOuter());
+		PreInputComponent->BufferInput(OutInputTagSet.HoldTag.Tag, OutInputTagSet.HoldTag.Priority);
 	}
 }
 
@@ -223,11 +227,13 @@ void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
 		if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
 			ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
 		{
-			if (OutInputTagSet.CompleteTag != FGameplayTag())
+			if (OutInputTagSet.CompleteTag.Tag != FGameplayTag())
 			{
-				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.CompleteTag));
+				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.CompleteTag.Tag));
 			}
 		}
+		UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(GetOuter());
+		PreInputComponent->BufferInput(OutInputTagSet.CompleteTag.Tag, OutInputTagSet.CompleteTag.Priority);
 	}
 }
 

@@ -33,7 +33,7 @@ namespace MHWTags
 	*/
 
 	// --- State ---
-	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Sheathed, "State.Weapon.Sheathed");
+	UE_DEFINE_GAMEPLAY_TAG(State_ComboWindow, "State.ComboWindow");
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Drawn, "State.Weapon.Drawn");
 	UE_DEFINE_GAMEPLAY_TAG(State_CanMove, "State.CanMove");
 	
@@ -43,6 +43,7 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_RunLoop, "Msg.Locomotion.RunLoop");
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Stop, "Msg.Locomotion.Stop");
 	UE_DEFINE_GAMEPLAY_TAG(Msg_Locomotion_Pivot, "Msg.Locomotion.Pivot");
+	UE_DEFINE_GAMEPLAY_TAG(Msg_Animation_Complete, "Msg.Animation.Complete");
 	/*UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging, "State.Combat.Charging");
 	UE_DEFINE_GAMEPLAY_TAG(State_Combat_HitPause, "State.Combat.HitPause");
 	

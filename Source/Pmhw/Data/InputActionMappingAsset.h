@@ -6,18 +6,29 @@
 #include "InputActionMappingAsset.generated.h"
 
 USTRUCT(BlueprintType)
+struct FInputActionTagAndPriority
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTag Tag = FGameplayTag();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Priority = 0;
+};
+
+USTRUCT(BlueprintType)
 struct FInputActionTagSet
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag InputTag = FGameplayTag(); // 原始输入标签 (如 Input.X)
+	FInputActionTagAndPriority InputTag; // 原始输入标签 (如 Input.X)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag HoldTag = FGameplayTag(); // 蓄力标签 (如 Input.X.Hold)
+	FInputActionTagAndPriority HoldTag; // 蓄力标签 (如 Input.X.Hold)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag CompleteTag = FGameplayTag(); // 完成标签 (如 Input.X.Completed)
+	FInputActionTagAndPriority CompleteTag; // 完成标签 (如 Input.X.Completed)
 };
 
 // Data Asset 类
