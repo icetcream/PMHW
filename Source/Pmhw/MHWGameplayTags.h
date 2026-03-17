@@ -45,6 +45,8 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Animation_Complete);
 	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging);    // 蓄力中
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_IsMoving); 
+	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_HitPause);    // 卡肉中
 	
     

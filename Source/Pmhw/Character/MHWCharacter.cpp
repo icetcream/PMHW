@@ -1,8 +1,11 @@
 ﻿// MHWCharacter.cpp
 #include "Character/MHWCharacter.h"
+
+#include "AbilitySystemComponent.h"
 #include "Input/MHWInputComponent.h" // 引入自定义组件
 #include "Input/MHWInputConfig.h"
 #include "EnhancedInputSubsystems.h"
+#include "MeleeTraceComponent.h"
 #include "MHWGameplayTags.h"
 #include "MHWMovementComponent.h"
 #include "Character/MHWPawnExtensionComponent.h"
@@ -25,6 +28,7 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	MHWEquipmentManagerComponent = CreateDefaultSubobject<UMHWEquipmentManagerComponent>(TEXT("MHWEquipmentManagerComponent"));
 	MHWStateTreeComponent = CreateDefaultSubobject<UStateTreeComponent>("MHWStateTreeComponent");
 	MHWComboPreInputComponent = CreateDefaultSubobject<UMHWComboPreInputComponent>(TEXT("MHWComboPreInputComponent"));
+	MHWMeleeTraceComponent = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MHWMeleeTraceComponent"));
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -54,21 +58,23 @@ void AMHWCharacter::BeginPlay()
 void AMHWCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	/*if (GetMesh() && GetMesh()->GetAnimInstance())
+	UAbilitySystemComponent* AbilitySystemComponent = GetAbilitySystemComponent();
+	if (!AbilitySystemComponent) return;
+	float CurrentAcceleration = GetCharacterMovement()->GetCurrentAcceleration().Size();
+	
+	bool bIsIntendingToMove = CurrentAcceleration > 10.0f; 
+	
+	bool bHasMovingTag = AbilitySystemComponent->HasMatchingGameplayTag(MHWTags::State_IsMoving);
+	
+	if (bIsIntendingToMove && !bHasMovingTag)
 	{
-		// 直接从源头（AnimInstance）抓取这一帧提取到的 Root Motion
-		FRootMotionMovementParams ExtractedRootMotion = GetMesh()->GetAnimInstance()->ConsumeExtractedRootMotion(1.0f); // 注意：Consume 会清空数据，仅供 Debug 测试！
-        
-		// 注意！上面的 Consume 会导致真正的移动失效（因为被你偷吃掉了）
-		// 所以这个方法只能用来“看有没有数据”，看完你的角色肯定动不了了。
-		// 测完记得删掉。ss
+		AbilitySystemComponent->AddLooseGameplayTag(MHWTags::State_IsMoving);
+	}
+	else if (!bIsIntendingToMove && bHasMovingTag)
+	{
+		AbilitySystemComponent->RemoveLooseGameplayTag(MHWTags::State_IsMoving);
+	}
 
-		if (!ExtractedRootMotion.GetRootMotionTransform().GetRotation().IsIdentity())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Red, 
-				FString::Printf(TEXT("AnimInstance 产出了旋转: %s"), *ExtractedRootMotion.GetRootMotionTransform().GetRotation().Rotator().ToString()));
-		}
-	}*/
 }
 
 void AMHWCharacter::PossessedBy(AController* NewController)
@@ -114,6 +120,11 @@ UStateTreeComponent* AMHWCharacter::GetStateTreeComponent_Implementation()
 UMHWComboPreInputComponent* AMHWCharacter::GetComboPreInputComponent_Implementation()
 {
 	return MHWComboPreInputComponent;
+}
+
+UMeleeTraceComponent* AMHWCharacter::GetMeleeTraceComponent_Implementation()
+{
+	return MHWMeleeTraceComponent;
 }
 
 

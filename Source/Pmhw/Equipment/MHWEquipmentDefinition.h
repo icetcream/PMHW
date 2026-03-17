@@ -6,6 +6,7 @@
 
 #include "MHWEquipmentDefinition.generated.h"
 
+class UMHWHitStopData;
 class UInputMappingContext;
 class AActor;
 class UMHWAbilitySet;
@@ -58,4 +59,7 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, Category=Equipment)
 	UInputMappingContext* InputMappingContext;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat Feel")
+	TObjectPtr<const UMHWHitStopData> HitStopData;
 };                                       

@@ -18,6 +18,7 @@ class PMHW_API AMHWPlayerState : public APlayerState, public IAbilitySystemInter
 	GENERATED_BODY()
 public:
 	AMHWPlayerState(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
 	UFUNCTION(BlueprintCallable, Category = "MHW|PlayerState")
 	UMHWAbilitySystemComponent* GetMHWAbilitySystemComponent() const { return AbilitySystemComponent; }
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;

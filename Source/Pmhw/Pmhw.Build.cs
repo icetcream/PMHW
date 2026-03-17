@@ -8,7 +8,6 @@ public class Pmhw : ModuleRules
 	public Pmhw(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
 		/*PublicIncludePaths.AddRange(
 			new string[] {
 				Path.Combine(ModuleDirectory, "Public")
@@ -24,6 +23,7 @@ public class Pmhw : ModuleRules
 			new string[]
 			{
 				"Core",
+					
 				"CoreUObject",
 				"Engine",
 				"InputCore",

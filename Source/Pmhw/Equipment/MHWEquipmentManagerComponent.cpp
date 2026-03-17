@@ -62,6 +62,10 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 	NewEntry.EquipmentDefinition = EquipmentDefinition;
 	NewEntry.Instance = NewObject<UMHWEquipmentInstance>(OwnerComponent->GetOwner(), InstanceType);  //@TODO: Using the actor instead of component as the outer due to UE-127172
 	Result = NewEntry.Instance;
+	if (Result)
+	{
+		Result->SetEquipmentDefinition(EquipmentDefinition);
+	}
 	
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem();
 	

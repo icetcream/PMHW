@@ -9,6 +9,8 @@
 #include "Interface/MHWCharacterInterface.h"
 #include "MHWCharacter.generated.h"
 
+class UMeleeTraceComponent;
+class UHitboxTraceComponent;
 class UStateTreeComponent;
 class UMHWEquipmentManagerComponent;
 class UMHWPawnExtensionComponent;
@@ -35,6 +37,7 @@ public:
 	virtual const UMHWEquipmentManagerComponent* GetEquipmentManagerComponent_Implementation() override;
 	virtual UStateTreeComponent* GetStateTreeComponent_Implementation() override;
 	virtual UMHWComboPreInputComponent* GetComboPreInputComponent_Implementation() override;
+	virtual UMeleeTraceComponent* GetMeleeTraceComponent_Implementation() override;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
@@ -48,6 +51,9 @@ private:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMHWComboPreInputComponent> MHWComboPreInputComponent;
+	
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMeleeTraceComponent> MHWMeleeTraceComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	FGameplayTagContainer CurrentComboState;

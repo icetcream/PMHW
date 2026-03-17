@@ -19,6 +19,11 @@ UMHWEquipmentInstance::UMHWEquipmentInstance(const FObjectInitializer& ObjectIni
 
 }
 
+void UMHWEquipmentInstance::SetEquipmentDefinition(TSubclassOf<UMHWEquipmentDefinition> InDef)
+{
+	EquipmentDef = InDef;
+}
+
 UWorld* UMHWEquipmentInstance::GetWorld() const
 {
 	if (APawn* OwningPawn = GetPawn())
@@ -65,6 +70,25 @@ void UMHWEquipmentInstance::UpdateAttachment(FName NewSocketName)
 		}
 	}
 }
+
+const UMHWHitStopData* UMHWEquipmentInstance::GetHitStopData() const
+{
+	// 如果之前成功绑定了 Definition
+	if (EquipmentDef != nullptr)
+	{
+		// 通过 GetDefault 获取该类的静态配置实例 (CDO)
+		const UMHWEquipmentDefinition* DefCDO = GetDefault<UMHWEquipmentDefinition>(EquipmentDef);
+		if (DefCDO)
+		{
+			// 返回策划在蓝图里配好的卡肉数据资产！
+			return DefCDO->HitStopData;
+		}
+	}
+	// 如果没配，或者发生了异常，返回空
+	return nullptr;
+}
+
+
 
 void UMHWEquipmentInstance::SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn)
 {

@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "Engine/World.h"
-
 #include "MHWEquipmentInstance.generated.h"
 
+class UMHWHitStopData;
+class UMHWEquipmentDefinition;
 class AActor;
 class APawn;
 struct FFrame;
@@ -27,6 +27,9 @@ class UMHWEquipmentInstance : public UObject
 
 public:
 	UMHWEquipmentInstance(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	
+	// 【新增 1】：给外部（比如 AddEntry）调用的初始化方法
+	virtual void SetEquipmentDefinition(TSubclassOf<UMHWEquipmentDefinition> InDef);
 
 	//~UObject interface
 	virtual bool IsSupportedForNetworking() const override { return false; }
@@ -46,10 +49,13 @@ public:
 	APawn* GetTypedPawn(TSubclassOf<APawn> PawnType) const;
 
 	UFUNCTION(BlueprintPure, Category=Equipment)
-	AActor* GetSpawnedActors() const { return SpawnedActor; }
+	AActor* GetSpawnedActor() const { return SpawnedActor; }
 	
 	UFUNCTION(BlueprintCallable, Category=Equipment)
 	void UpdateAttachment(FName NewSocketName);
+	
+	UFUNCTION(BlueprintPure, Category = "Combat Feel")
+	const UMHWHitStopData* GetHitStopData() const;
 	
 
 	virtual void SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn);
@@ -73,5 +79,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<AActor> SpawnedActor;
 	
+	UPROPERTY()
+	TSubclassOf<UMHWEquipmentDefinition> EquipmentDef;
 };
 

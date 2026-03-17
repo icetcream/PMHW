@@ -12,6 +12,8 @@ AMHWPlayerState::AMHWPlayerState(const FObjectInitializer& ObjectInitializer)
 	AbilitySystemComponent = ObjectInitializer.CreateDefaultSubobject<UMHWAbilitySystemComponent>(this, TEXT("AbilitySystemComponent"));
 }
 
+
+
 UAbilitySystemComponent* AMHWPlayerState::GetAbilitySystemComponent() const
 {
 	return GetMHWAbilitySystemComponent();

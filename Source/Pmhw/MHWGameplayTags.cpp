@@ -34,6 +34,8 @@ namespace MHWTags
 
 	// --- State ---
 	UE_DEFINE_GAMEPLAY_TAG(State_ComboWindow, "State.ComboWindow");
+	UE_DEFINE_GAMEPLAY_TAG(State_IsMoving, "State.IsMoving");
+	
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Drawn, "State.Weapon.Drawn");
 	UE_DEFINE_GAMEPLAY_TAG(State_CanMove, "State.CanMove");
 	
