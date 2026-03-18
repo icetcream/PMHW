@@ -8,6 +8,7 @@
 #include "MeleeTraceComponent.h"
 #include "MHWGameplayTags.h"
 #include "MHWMovementComponent.h"
+#include "MotionWarpingComponent.h"
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "Equipment/MHWEquipmentManagerComponent.h"
@@ -29,6 +30,7 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	MHWStateTreeComponent = CreateDefaultSubobject<UStateTreeComponent>("MHWStateTreeComponent");
 	MHWComboPreInputComponent = CreateDefaultSubobject<UMHWComboPreInputComponent>(TEXT("MHWComboPreInputComponent"));
 	MHWMeleeTraceComponent = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MHWMeleeTraceComponent"));
+	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;

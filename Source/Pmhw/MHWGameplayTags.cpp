@@ -36,7 +36,13 @@ namespace MHWTags
 	UE_DEFINE_GAMEPLAY_TAG(State_ComboWindow, "State.ComboWindow");
 	UE_DEFINE_GAMEPLAY_TAG(State_IsMoving, "State.IsMoving");
 	
-	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Drawn, "State.Weapon.Drawn");
+	UE_DEFINE_GAMEPLAY_TAG(State_Combat_Drawn, "State.Combat.Drawn");
+	UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging, "State.Combat.Charging");
+	UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging_XLZ, "State.Combat.Charging.XLZ");
+	UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging_XLZ2, "State.Combat.Charging.XLZ2");
+	UE_DEFINE_GAMEPLAY_TAG(State_Combat_Charging_XLZ3, "State.Combat.Charging.XLZ3");
+	UE_DEFINE_GAMEPLAY_TAG(State_Rotation_BlockInput, "State.Rotation.BlockInput");
+	UE_DEFINE_GAMEPLAY_TAG(State_Movement_BlockInput, "State.Movement.BlockInput");
 	UE_DEFINE_GAMEPLAY_TAG(State_CanMove, "State.CanMove");
 	
 	// --- Msg ---

@@ -9,6 +9,7 @@
 #include "Interface/MHWCharacterInterface.h"
 #include "MHWCharacter.generated.h"
 
+class UMotionWarpingComponent;
 class UMeleeTraceComponent;
 class UHitboxTraceComponent;
 class UStateTreeComponent;
@@ -54,6 +55,9 @@ private:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMeleeTraceComponent> MHWMeleeTraceComponent;
+	
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	FGameplayTagContainer CurrentComboState;

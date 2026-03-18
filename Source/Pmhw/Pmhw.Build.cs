@@ -34,7 +34,8 @@ public class Pmhw : ModuleRules
 				"StateTreeModule",
 				"GameplayStateTreeModule",
 				"AnimationModifiers",
-				"AnimationBlueprintLibrary"
+				"AnimationBlueprintLibrary",
+				"MotionWarping"
 			}
 		);
 

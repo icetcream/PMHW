@@ -6,6 +6,7 @@
 #include "AbilitySystemGlobals.h"
 #include "EnhancedInputSubsystemInterface.h"
 #include "EnhancedInputSubsystems.h"
+#include "MHWGameplayTags.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
 #include "Player/MHWLocalPlayer.h"
@@ -178,10 +179,6 @@ void UMHWEquipmentManagerComponent::UnequipItem(UMHWEquipmentInstance* ItemInsta
 void UMHWEquipmentManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	GetPlayerState<AMHWPlayerState>()->GetAbilitySystemComponent()->RegisterGameplayTagEvent(
-		FGameplayTag::RequestGameplayTag(FName("State.Weapon.Drawn")),
-		EGameplayTagEventType::NewOrRemoved
-	).AddUObject(this, &UMHWEquipmentManagerComponent::OnWeaponDrawnStateChanged);
 }
 
 

@@ -31,9 +31,17 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Interact);        // 比如收刀/R1
 
 	// --- 状态相关标签 (State Tags) ---
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_ComboWindow);    // 收刀
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Weapon_Drawn);  // 拔刀
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_ComboWindow);   
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Drawn); 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_CanMove);
+	
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging_XLZ);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging_XLZ2);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging_XLZ3);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Rotation_BlockInput);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Movement_BlockInput);
+	
 	
 	// --- Msg locomotion
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Idle);
@@ -50,11 +58,7 @@ namespace MHWTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_HitPause);    // 卡肉中
 	
     
-	// --- 技能相关标签 (Ability Tags) ---
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_GreatSword_Charge); // 蓄力技能ID
-	
-	// 拔剑相关
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_GreatSword_Sheathed);
+
 
 	
  }
