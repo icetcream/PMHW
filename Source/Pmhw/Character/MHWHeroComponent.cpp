@@ -81,12 +81,12 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 					TArray<uint32> BindHandles;
 					MHWIC->BindAbilityActions(InputConfig, this, &ThisClass::Input_AbilityInputTagPressed,&ThisClass::Input_AbilityInputTagHold, &ThisClass::Input_AbilityInputTagReleased, /*out*/ BindHandles);
 
-					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Move, ETriggerEvent::Completed, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Look_Stick, ETriggerEvent::Triggered, this, &ThisClass::Input_LookStick, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWTags::InputTag_AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Move, ETriggerEvent::Completed, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Look_Stick, ETriggerEvent::Triggered, this, &ThisClass::Input_LookStick, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
 				}
 			}
 		}
@@ -104,7 +104,7 @@ void UMHWHeroComponent::BeginPlay()
 void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 {
 	//TODO；可能之后修改这个初始化的阶段
-	if (CurrentState == MHWTags::InitState_GameplayReady)
+	if (CurrentState == MHWInitStateTags::GameplayReady)
 	{
 		APawn* Pawn = GetPawn<APawn>();
 		AMHWPlayerState* MHWPS = GetPlayerState<AMHWPlayerState>();

@@ -142,23 +142,23 @@ bool UMHWPawnExtensionComponent::CanChangeInitState(FGameplayTag NextState) cons
 	APawn* Pawn = GetPawn<APawn>();
 	if (!Pawn) return false;
 
-	if (NextState == MHWTags::InitState_Spawned)
+	if (NextState == MHWInitStateTags::Spawned)
 		return true;
 
-	if (NextState == MHWTags::InitState_DataAvailable)
+	if (NextState == MHWInitStateTags::DataAvailable)
 	{
 		// 必须要有控制器 (PossessedBy 触发后此项才会为真)
 		return Pawn->GetController() != nullptr;
 	}
 
-	if (NextState == MHWTags::InitState_DataInitialized)
+	if (NextState == MHWInitStateTags::DataInitialized)
 	{
 		// 只要 DataAvailable 过了，通常这一步自动放行，
 		// 因为这一步是用来给 CombatComponent 执行 InitAbilityActorInfo 的时机
 		return true;
 	}
 
-	if (NextState == MHWTags::InitState_GameplayReady)
+	if (NextState == MHWInitStateTags::GameplayReady)
 	{
 		// 必须等到 SetupPlayerInputComponent 被调用后
 		return bIsInputSet;
@@ -171,7 +171,7 @@ bool UMHWPawnExtensionComponent::CanChangeInitState(FGameplayTag NextState) cons
 
 void UMHWPawnExtensionComponent::CheckInitialization()
 {
-	static const TArray<FGameplayTag> StateChain = { MHWTags::InitState_Spawned, MHWTags::InitState_DataAvailable, MHWTags::InitState_DataInitialized, MHWTags::InitState_GameplayReady };
+	static const TArray<FGameplayTag> StateChain = { MHWInitStateTags::Spawned, MHWInitStateTags::DataAvailable, MHWInitStateTags::DataInitialized, MHWInitStateTags::GameplayReady };
 	int32 CurrentIndex = StateChain.IndexOfByKey(CurrentInitState);
 	int32 NextIndex = CurrentIndex + 1;
 

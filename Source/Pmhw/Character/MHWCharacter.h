@@ -6,9 +6,14 @@
 #include "GameFramework/Character.h"
 #include "GameplayTagContainer.h" // 需要包含 GameplayTags 模块
 #include "MHWComboPreInputComponent.h"
+#include "MHWGameplayTags.h"
 #include "Interface/MHWCharacterInterface.h"
+#include "state/MHWLocomotionState.h"
 #include "MHWCharacter.generated.h"
 
+struct FMHWMovementGaitSettings;
+class UMHWMovementSettings;
+class UMHWAnimInstance;
 class UMotionWarpingComponent;
 class UMeleeTraceComponent;
 class UHitboxTraceComponent;
@@ -39,6 +44,94 @@ public:
 	virtual UStateTreeComponent* GetStateTreeComponent_Implementation() override;
 	virtual UMHWComboPreInputComponent* GetComboPreInputComponent_Implementation() override;
 	virtual UMeleeTraceComponent* GetMeleeTraceComponent_Implementation() override;
+	
+public:
+	// 1. 提供给外部或蓝图调用的 Setter (比如你的输入组件按下 Shift 时调用)
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion")
+	void SetDesiredGait(FGameplayTag NewDesiredGait);
+	
+protected:
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|Settings")
+	TObjectPtr<UMHWMovementSettings> MovementSettings;
+
+	// ==========================================
+	// 期望状态 (Desired State - 玩家意图)
+	// ==========================================
+	// (移除了 Replicated 和 bDesiredAiming)
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Desired State")
+	FGameplayTag DesiredRotationMode{MHWRotationModeTags::VelocityDirection};
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Desired State")
+	FGameplayTag DesiredStance{MHWStanceTags::Standing};
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Desired State")
+	FGameplayTag DesiredGait{MHWGaitTags::Running};
+	
+	// ==========================================
+	// 实际状态 (Actual State - 运行时数据)
+	// ==========================================
+	
+	// 动画实例缓存，方便快速调用
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|State", Transient, Meta = (ShowInnerProperties))
+	TWeakObjectPtr<UMHWAnimInstance> AnimationInstance;
+
+	// 运动模式 (地面/空中等)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FGameplayTag LocomotionMode{MHWLocomotionModeTags::Grounded};
+
+	// 当前旋转模式
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FGameplayTag RotationMode{MHWRotationModeTags::VelocityDirection};
+
+	// 当前姿态 (站立/下蹲等)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FGameplayTag Stance{MHWStanceTags::Standing};
+
+	// 当前步态 (走/跑/冲刺)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FGameplayTag Gait{MHWGaitTags::Walking};
+
+	// 动作标签 (翻滚/攻击等，用于打断常规移动)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FGameplayTag LocomotionAction;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FVector InputDirection{ForceInit};
+
+	// 期望的速度朝向 (去除了 Replicated)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient, Meta = (ClampMin = -180, ClampMax = 180, ForceUnits = "deg"))
+	float DesiredVelocityYawAngle{0.0f};
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	uint8 bHasDesiredVelocity : 1 {false};
+
+	// 核心运动数据结构体 (速度、加速度等计算结果都存在这里)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
+	FMHWLocomotionState LocomotionState;
+	
+	// 用于落地时增加摩擦力的计时器 (如果你不做落地打滑的处理，这个也可以删掉)
+	FTimerHandle BrakingFrictionFactorResetTimer;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State")
+	FGameplayTag CurrentWeaponState{MHWWeaponTags::Sheathed};
+	
+	bool CanSprint() const;
+
+	// 3. 计算本帧允许的最大步态
+	FGameplayTag CalculateMaxAllowedGait() const;
+	
+	void RefreshInput();
+	float CalculateGaitAmount() const;
+	void RefreshMovementPhysics();
+	void RefreshLocomotion();
+
+	// 3. 刷新步态与状态 (根据速度和输入，决定现在的真实 Gait 和 RotationMode)
+	void RefreshGait();
+	void RefreshRotationMode();
+	
+	const FMHWMovementGaitSettings* GetCurrentGaitSettings() const;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
@@ -61,6 +154,8 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	FGameplayTagContainer CurrentComboState;
+	
+
 };
 
 

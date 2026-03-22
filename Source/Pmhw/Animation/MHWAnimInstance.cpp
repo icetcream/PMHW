@@ -22,7 +22,7 @@ void UMHWAnimInstance::InitializeWithAbilitySystem(UAbilitySystemComponent* ASC)
 
 	// 1. 监听父级 Tag "State.Combat.Charging"
 	// 因为子 Tag (如 XLZ) 添加时，父级 Tag 的计数也会变化，所以我们监听这一个就够了！
-	ChargeTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWTags::State_Combat_Charging, EGameplayTagEventType::NewOrRemoved)
+	ChargeTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::NewOrRemoved)
 		.AddUObject(this, &UMHWAnimInstance::OnChargeTagChanged);
 
 	// 2. 初始化时，先手动拉取一次状态 (防止动画实例创建晚于 Tag 的添加)
@@ -99,7 +99,7 @@ void UMHWAnimInstance::UpdateChargingTypeFromTags()
 	
 	if (!ASC) return;
 	// 1. 先判断大类：角色现在身上有没有任何 "State.Combat.Charging" 相关的 Tag？
-	bIsCharging = ASC->HasMatchingGameplayTag(MHWTags::State_Combat_Charging);
+	bIsCharging = ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging);
 
 	if (!bIsCharging)
 	{
@@ -115,19 +115,19 @@ void UMHWAnimInstance::UpdateChargingTypeFromTags()
 	// 2. 如果在蓄力，具体是哪一种？(优先级从高到低判断)
 	// (使用 HasMatchingGameplayTag 精确查询具体的子 Tag)
 	
-	if (ASC->HasMatchingGameplayTag(MHWTags::State_Combat_Charging_XLZ3)) // 真蓄
+	if (ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging_XLZ3)) // 真蓄
 	{
 		CurrentCombatChargingType = ECombatChargingType::CombatChargingZLZ3;
 		// 打印红色：真蓄力
 		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Red, TEXT("当前状态：真蓄力斩 (XLZ3)")); }
 	}
-	else if (ASC->HasMatchingGameplayTag(MHWTags::State_Combat_Charging_XLZ2)) // 强蓄
+	else if (ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging_XLZ2)) // 强蓄
 	{
 		CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ2;
 		// 打印橙色：强蓄力
 		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Orange, TEXT("当前状态：强蓄力斩 (XLZ2)")); }
 	}
-	else if (ASC->HasMatchingGameplayTag(MHWTags::State_Combat_Charging_XLZ)) // 普蓄
+	else if (ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging_XLZ)) // 普蓄
 	{
 		CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ1;
 		// 打印黄色：普蓄力

@@ -8,57 +8,84 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseName); \
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseName##_Hold); \
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseName##_Completed);
 
-namespace MHWTags
+namespace MHWInputTags
 {
 	// --- 输入相关标签 (Input Tags) ---
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Move);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Look_Mouse);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Look_Stick);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Crouch);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_AutoRun);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_ToggleDraw);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Move);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Look_Mouse);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Look_Stick);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Crouch);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AutoRun);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Weapon_ToggleDraw);
 	
+	
+	
+	DECLARE_INPUT_TAG_SET(PrimaryAttack);   // 比如三角键
+	DECLARE_INPUT_TAG_SET(SecondaryAttack); // 比如圆圈键
+	DECLARE_INPUT_TAG_SET(SpecialAction); // 组合按键
+	DECLARE_INPUT_TAG_SET(Roll);
+	
+}
+
+namespace MHWInitStateTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Spawned); 
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(DataAvailable);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(DataInitialized);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayReady);
+}
+
+namespace MHWStateTags
+{
 	// --- 初始化相关 ---
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_Spawned); 
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_DataAvailable);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_DataInitialized);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InitState_GameplayReady);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboWindow);   
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Drawn); 
 	
-	DECLARE_INPUT_TAG_SET(InputTag_PrimaryAttack);   // 比如三角键
-	DECLARE_INPUT_TAG_SET(InputTag_SecondaryAttack); // 比如圆圈键
-	DECLARE_INPUT_TAG_SET(InputTag_SpecialAction); // 组合按键
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Charging);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Charging_XLZ);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Charging_XLZ2);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Charging_XLZ3);
 	
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Interact);        // 比如收刀/R1
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Rotation_BlockInput);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Movement_BlockInput);
+	
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Locomotion_Idle);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Locomotion_StartMove);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Locomotion_RunLoop);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Locomotion_Stop);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Locomotion_Pivot);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(IsMoving); 
+}
 
-	// --- 状态相关标签 (State Tags) ---
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_ComboWindow);   
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Drawn); 
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_CanMove);
-	
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging_XLZ);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging_XLZ2);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging_XLZ3);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Rotation_BlockInput);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Movement_BlockInput);
-	
-	
-	// --- Msg locomotion
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Idle);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_StartMove);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_RunLoop);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Stop);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Locomotion_Pivot);
-	
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Msg_Animation_Complete);
-	
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Charging);    // 蓄力中
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_IsMoving); 
-	
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_HitPause);    // 卡肉中
-	
-    
+namespace MHWLocomotionModeTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Grounded)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InAir)
+}
+namespace MHWStanceTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Standing)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Crouching)
+}
+namespace MHWGaitTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Walking)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Running)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Sprinting)
+}
 
+namespace MHWMessageTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Animation_Complete);
+}
 
-	
- }
+namespace MHWRotationModeTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(VelocityDirection)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(EnemyDirection)
+}
+namespace MHWWeaponTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Sheathed)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GreatSword)
+}

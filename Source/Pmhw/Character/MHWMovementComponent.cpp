@@ -1,5 +1,8 @@
 ﻿#include "MHWMovementComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "MHWGameplayTags.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "GameFramework/Character.h"
@@ -19,6 +22,7 @@ void UMHWMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
 }
+
 
 bool UMHWMovementComponent::CalculateIsInPivot(FVector VelocityDirection, FVector DesiredDirection) const
 {
@@ -82,5 +86,38 @@ const FMHWCharacterGroundInfo& UMHWMovementComponent::GetGroundInfo()
 	CachedGroundInfo.LastUpdateFrame = GFrameCounter;
 
 	return CachedGroundInfo;
+}
+
+
+
+void UMHWMovementComponent::UpdateSmoothInputDirection(FVector RawInputDirection, float InterpSpeed, float DeltaTime)
+{
+	// 如果传入的速度小于等于 0，说明不需要平滑，直接赋值
+	if (InterpSpeed <= 0.f)
+	{
+		SmoothedInputDirection = RawInputDirection;
+	}
+	else
+	{
+		// 核心平滑：从当前平滑向量，慢慢向新的原始输入向量靠拢
+		SmoothedInputDirection = FMath::VInterpTo(SmoothedInputDirection, RawInputDirection, DeltaTime, InterpSpeed);
+	}
+
+	// ⚠️ 安全归一化：防止 VInterpTo 在处理 180 度大转弯时，由于走直线捷径导致向量变短（掉速）
+	if (!SmoothedInputDirection.IsNearlyZero())
+	{
+		SmoothedInputDirection.Normalize();
+	}
+}
+
+void UMHWMovementComponent::ResetSmoothInputDirection(FVector NewDirection)
+{
+	// 获取安全的 2D 标准化向量，瞬间重置
+	SmoothedInputDirection = NewDirection.GetSafeNormal2D();
+}
+
+void UMHWMovementComponent::SetLocomotionState(ELocomotionState NewState)
+{
+	CurrentState = NewState;
 }
 

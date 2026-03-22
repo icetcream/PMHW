@@ -27,8 +27,8 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 	{
 		// 注意：使用 AddLooseGameplayTag，这是给外部系统(如 StateTree)直接改状态用的
 		ASC->AddLooseGameplayTag(SpecificChargeTag);
-		ASC->AddLooseGameplayTag(MHWTags::State_Movement_BlockInput);
-		ASC->AddLooseGameplayTag(MHWTags::State_Rotation_BlockInput);
+		ASC->AddLooseGameplayTag(MHWStateTags::Movement_BlockInput);
+		ASC->AddLooseGameplayTag(MHWStateTags::Rotation_BlockInput);
 	}
 
 	return EStateTreeRunStatus::Running;
@@ -114,8 +114,8 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 		if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Character))
 		{
 			ASC->RemoveLooseGameplayTag(SpecificChargeTag);
-			ASC->RemoveLooseGameplayTag(MHWTags::State_Movement_BlockInput);
-			ASC->RemoveLooseGameplayTag(MHWTags::State_Rotation_BlockInput);
+			ASC->RemoveLooseGameplayTag(MHWStateTags::Movement_BlockInput);
+			ASC->RemoveLooseGameplayTag(MHWStateTags::Rotation_BlockInput);
 		}
 
 		if (FMath::Abs(InstanceData.CurrentTurnYaw) > KINDA_SMALL_NUMBER)
