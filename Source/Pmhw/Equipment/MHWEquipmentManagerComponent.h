@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameplayTagContainer.h"
 #include "AbilitySystem/MHWAbilitySet.h"
 #include "Character/MHWPawnComponent.h"
 #include "MHWEquipmentManagerComponent.generated.h"
@@ -38,6 +39,12 @@ private:
 	// Authority-only list of granted handles
 	UPROPERTY()
 	FMHWAbilitySet_GrantedHandles GrantedHandles;
+
+	UPROPERTY()
+	FGameplayTag AppliedWeaponStateTag;
+
+	UPROPERTY()
+	uint8 bAppliedMovementSettingsOnEquip : 1 {false};
 };
 
 

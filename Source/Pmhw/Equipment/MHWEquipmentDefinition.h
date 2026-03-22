@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Templates/SubclassOf.h"
+#include "Settings/MovementSettings.h"
 
 #include "MHWEquipmentDefinition.generated.h"
 
@@ -62,4 +63,15 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat Feel")
 	TObjectPtr<const UMHWHitStopData> HitStopData;
+
+	// Weapon state to set on the character when this equipment is equipped.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	FGameplayTag WeaponStateTag = MHWWeaponTags::Sheathed;
+
+	// If enabled, add/update one entry in DA_MovementSettings.WeaponStates on equip.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	bool bAddMovementSettingsOnEquip = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement", meta = (EditCondition = "bAddMovementSettingsOnEquip"))
+	FMHWMovementRotationModeSettings MovementSettingsToAdd;
 };                                       

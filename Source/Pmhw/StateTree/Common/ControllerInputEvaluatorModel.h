@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "UObject/NoExportTypes.h"
 // 引入你自定义的组件头文件
 // #include "AdvancedLocoMovementComponent.h" 
@@ -38,4 +39,10 @@ public:
 	// ✨ [新增] 缓存角色当前身体的面朝方向 (Forward Vector)
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Locomotion")
 	FVector ActorForwardDirection = FVector::ZeroVector;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Locomotion")
+	FGameplayTag CurrentWeaponState;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Locomotion")
+	FGameplayTagContainer CurrentWeaponStateContainer;
 };

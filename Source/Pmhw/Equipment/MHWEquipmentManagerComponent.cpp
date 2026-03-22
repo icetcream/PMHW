@@ -7,6 +7,7 @@
 #include "EnhancedInputSubsystemInterface.h"
 #include "EnhancedInputSubsystems.h"
 #include "MHWGameplayTags.h"
+#include "Character/MHWCharacter.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
 #include "Player/MHWLocalPlayer.h"
@@ -67,6 +68,20 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 	{
 		Result->SetEquipmentDefinition(EquipmentDefinition);
 	}
+
+	if (AMHWCharacter* Character = Cast<AMHWCharacter>(GetPawn()))
+	{
+		if (EquipmentCDO->WeaponStateTag.IsValid())
+		{
+			NewEntry.AppliedWeaponStateTag = EquipmentCDO->WeaponStateTag;
+		}
+
+		if (EquipmentCDO->bAddMovementSettingsOnEquip && NewEntry.AppliedWeaponStateTag.IsValid())
+		{
+			NewEntry.bAppliedMovementSettingsOnEquip =
+				Character->AddOrUpdateMovementSettingsForWeaponState(NewEntry.AppliedWeaponStateTag, EquipmentCDO->MovementSettingsToAdd);
+		}
+	}
 	
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem();
 	
@@ -110,6 +125,14 @@ void FMHWEquipmentList::RemoveEntry(UMHWEquipmentInstance* Instance)
 		}
 		if (Entry.Instance == Instance)
 		{
+			if (AMHWCharacter* Character = Cast<AMHWCharacter>(GetPawn()))
+			{
+				if (Entry.bAppliedMovementSettingsOnEquip && Entry.AppliedWeaponStateTag.IsValid())
+				{
+					Character->RemoveMovementSettingsForWeaponState(Entry.AppliedWeaponStateTag);
+				}
+			}
+
 			if (UMHWAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 			{
 				Entry.GrantedHandles.TakeFromAbilitySystem(ASC);

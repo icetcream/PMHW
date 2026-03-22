@@ -1,19 +1,26 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "MHWBaseMovementTask.h"
 #include "MHWTurnMovementTask.generated.h"
 
-
-
 USTRUCT()
 struct FMHWTurnMovementTaskInstanceData : public FMHWBaseMovementTaskInstanceData
 {
 	GENERATED_BODY()
+
+	FMHWTurnMovementTaskInstanceData()
+	{
+		bEnableRotationCurveCompensation = true;
+		RotationCompensationCurveName = TEXT("TurnRotationDelta");
+		RotationCompensationCurveScale = 1.0f;
+	}
+
 	UPROPERTY(EditAnywhere, Category = "Parameter|Turn")
-	float TurnTotalTime = 1.f;
+	float TurnTotalTime = 1.0f;
+
 	UPROPERTY(EditAnywhere, Category = "Parameter|Turn")
-	float TurnCurrentTime;
+	float TurnCurrentTime = 0.0f;
 };
 
 USTRUCT(meta = (DisplayName = "Turn Movement", Category = "MHW|Locomotion"))

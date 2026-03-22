@@ -45,6 +45,12 @@ struct FSTE_InputEvaluator_InstanceData
 	// 【输出】加速度（实际输入意图）与角色正前方的局部夹角（范围：-180 到 180，正数为偏右，负数为偏左）
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float AccelerationLocalAngle = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	FGameplayTag CurrentWeaponState;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	FGameplayTagContainer CurrentWeaponStateContainer;
 };
 
 // ==========================================

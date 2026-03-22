@@ -19,14 +19,29 @@ struct FMHWBaseMovementTaskInstanceData
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UControllerInputEvaluatorModel> InputEvaluatorModel = nullptr;
 	
-	UPROPERTY(EditAnywhere, Category = "Parameter")
+	UPROPERTY()
 	ELocomotionState TargetState = ELocomotionState::Idle;
+
+	UPROPERTY(EditAnywhere, Category = "Parameter|RotationCurve")
+	bool bEnableRotationCurveCompensation = false;
+
+	UPROPERTY(EditAnywhere, Category = "Parameter|RotationCurve")
+	FName RotationCompensationCurveName = NAME_None;
+
+	UPROPERTY(EditAnywhere, Category = "Parameter|RotationCurve")
+	float RotationCompensationCurveScale = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Parameter|Rotation")
+	float RotationTickRLerpSpeed = 12.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Parameter|Rotation")
+	float RotationTargetConstantLerpSpeed = 360.0f;
 };
 
 // ==============================================================================
 // 2. 基类 Task
 // ==============================================================================
-USTRUCT(meta = (DisplayName = "Base Movement"), Category = "Locomotion")
+USTRUCT(meta = (Hidden))
 struct FMHWBaseMovementTask : public FStateTreeTaskCommonBase{
 	GENERATED_BODY()
 
@@ -40,4 +55,8 @@ protected:
 	// ✨【核心功能】基类提供的受保护方法，供所有子类调用！
 	// 只要传入你的仓库模型和目标状态，基类帮你把脏活累活干完。
 	bool SetLocomotionState(UControllerInputEvaluatorModel* EvaluatorModel, ELocomotionState NewState) const;
+
+	void ApplyRotationCurveCompensation(UControllerInputEvaluatorModel* EvaluatorModel, bool bEnable, FName CurveName, float CurveScale) const;
+	void ClearRotationCurveCompensation(UControllerInputEvaluatorModel* EvaluatorModel) const;
+	void ApplyRotationInterpolationSettings(UControllerInputEvaluatorModel* EvaluatorModel, float InRotationTickRLerpSpeed, float InRotationTargetConstantLerpSpeed) const;
 };

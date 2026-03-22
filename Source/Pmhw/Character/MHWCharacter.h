@@ -8,6 +8,7 @@
 #include "MHWComboPreInputComponent.h"
 #include "MHWGameplayTags.h"
 #include "Interface/MHWCharacterInterface.h"
+#include "Settings/MovementSettings.h"
 #include "state/MHWLocomotionState.h"
 #include "MHWCharacter.generated.h"
 
@@ -49,6 +50,31 @@ public:
 	// 1. 提供给外部或蓝图调用的 Setter (比如你的输入组件按下 Shift 时调用)
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion")
 	void SetDesiredGait(FGameplayTag NewDesiredGait);
+
+	// Rotation data writer for StateTree tasks.
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
+	void SetTargetYawAngle(float TargetYawAngle);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
+	void SetTargetYawAngleSmooth(float TargetYawAngle, float DeltaTime, float RotationSpeed);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
+	void SetRotationCurveCompensation(bool bEnable, FName CurveName, float CurveScale);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
+	void SetRotationInterpolationSettings(float InRotationTickRLerpSpeed, float InRotationTargetConstantLerpSpeed);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Weapon")
+	void SetCurrentWeaponState(FGameplayTag NewWeaponState);
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion|Weapon")
+	FGameplayTag GetCurrentWeaponState() const { return CurrentWeaponState; }
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Settings")
+	bool AddOrUpdateMovementSettingsForWeaponState(FGameplayTag WeaponState, const FMHWMovementRotationModeSettings& InSettings);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Settings")
+	bool RemoveMovementSettingsForWeaponState(FGameplayTag WeaponState);
 	
 protected:
 	
@@ -110,6 +136,29 @@ protected:
 	// 核心运动数据结构体 (速度、加速度等计算结果都存在这里)
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
 	FMHWLocomotionState LocomotionState;
+
+	// Final actor rotation smoothing speed used in SmoothTickRotation().
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation")
+	float RotationTickRLerpSpeed{12.0f};
+
+	// Constant turn speed (deg/s) used to derive TargetRotation from acceleration yaw.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation")
+	float RotationTargetConstantLerpSpeed{360.0f};
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation", Transient)
+	bool bEnableRotationCurveCompensation = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation", Transient)
+	FName RotationCompensationCurveName = NAME_None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation", Transient)
+	float RotationCompensationCurveScale = 1.0f;
+
+	UPROPERTY(Transient)
+	float LastRotationCompensationCurveValue = 0.0f;
+
+	UPROPERTY(Transient)
+	bool bHasRotationCompensationCurveSample = false;
 	
 	// 用于落地时增加摩擦力的计时器 (如果你不做落地打滑的处理，这个也可以删掉)
 	FTimerHandle BrakingFrictionFactorResetTimer;
@@ -126,6 +175,7 @@ protected:
 	float CalculateGaitAmount() const;
 	void RefreshMovementPhysics();
 	void RefreshLocomotion();
+	void SmoothTickRotation(float DeltaTime);
 
 	// 3. 刷新步态与状态 (根据速度和输入，决定现在的真实 Gait 和 RotationMode)
 	void RefreshGait();
