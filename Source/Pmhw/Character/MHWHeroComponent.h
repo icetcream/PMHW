@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Delegates/Delegate.h"
 #include "GameplayTagContainer.h"
 #include "InputActionValue.h" 
 #include "InputMappingContext.h"
@@ -10,6 +11,7 @@
 
 
 class UMHWInputComponent;
+class UMHWAbilitySystemComponent;
 class UInputMappingContext;
 class UMHWInputConfig;
 class UInputComponent;
@@ -65,10 +67,25 @@ protected:
 	void SendInputEventToStateTree(FGameplayTag InputTag, APawn* Pawn, FName SuffixName);
 	
 	UMHWInputComponent* GetMHWInputComponent();
+	void BindMovementBlockMoveTagListener();
+	void UpdateMaxWalkSpeedScaleFromTags();
+	void OnMovementBlockMoveTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void BindRotationBlockTagListener();
+	void UpdateBlockRotationFromTags();
+	void OnRotationBlockTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
 	UPROPERTY(EditDefaultsOnly, Category = "MHW|Input")
 	TArray<FInputMappingContextAndPriority> DefaultInputMappings;
 private:
 	UPROPERTY()
 	TObjectPtr<UMHWInputComponent> InputComp;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMHWAbilitySystemComponent> CachedAbilitySystem = nullptr;
+
+	FDelegateHandle MovementBlockMoveTagDelegateHandle;
+	FDelegateHandle RotationBlockTagDelegateHandle;
+
+	bool bMovementBlockMoveTagListenerBound = false;
+	bool bRotationBlockTagListenerBound = false;
 };

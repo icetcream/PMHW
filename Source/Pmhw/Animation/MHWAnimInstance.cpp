@@ -18,6 +18,13 @@ void UMHWAnimInstance::InitializeWithAbilitySystem(UAbilitySystemComponent* ASC)
 {
 	if (!ASC) return;
 
+	if (CachedASC.Get() == ASC && ChargeTagDelegateHandle.IsValid())
+	{
+		UpdateChargingTypeFromTags();
+		return;
+	}
+
+	UnbindFromAbilitySystem();
 	CachedASC = ASC;
 
 	// 1. 监听父级 Tag "State.Combat.Charging"
@@ -66,6 +73,10 @@ void UMHWAnimInstance::NativeInitializeAnimation()
 
 void UMHWAnimInstance::NativeUninitializeAnimation()
 {
+	UnbindFromAbilitySystem();
+	CurrentChargeYaw = 0.0f;
+	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
+	bIsCharging = false;
 	Super::NativeUninitializeAnimation();
 }
 
@@ -97,7 +108,13 @@ void UMHWAnimInstance::UpdateChargingTypeFromTags()
 	// 1. 尝试获取缓存的 ASC
 	UAbilitySystemComponent* ASC = CachedASC.Get();
 	
-	if (!ASC) return;
+	if (!ASC)
+	{
+		bIsCharging = false;
+		CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
+		CurrentChargeYaw = 0.0f;
+		return;
+	}
 	// 1. 先判断大类：角色现在身上有没有任何 "State.Combat.Charging" 相关的 Tag？
 	bIsCharging = ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging);
 
@@ -146,4 +163,19 @@ void UMHWAnimInstance::UpdateChargingTypeFromTags()
 		// 打印紫色警告：发现父 Tag 但找不到子 Tag！
 		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Magenta, TEXT("异常：有 Charging 父级 Tag，但没找到 XLZ1/2/3 子 Tag！强制使用 1段")); }
 	}
+}
+
+void UMHWAnimInstance::UnbindFromAbilitySystem()
+{
+	if (UAbilitySystemComponent* ASC = CachedASC.Get())
+	{
+		if (ChargeTagDelegateHandle.IsValid())
+		{
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::NewOrRemoved)
+				.Remove(ChargeTagDelegateHandle);
+		}
+	}
+
+	ChargeTagDelegateHandle.Reset();
+	CachedASC.Reset();
 }

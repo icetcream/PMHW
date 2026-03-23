@@ -27,7 +27,7 @@ public:
 	void SetPawnData(const UMHWPawnData* InPawnData);
 	
 	UFUNCTION(BlueprintPure, Category = "MHW|Pawn")
-	UMHWAbilitySystemComponent* GetLyraAbilitySystemComponent() const { return AbilitySystemComponent; }
+	UMHWAbilitySystemComponent* GetMHWAbilitySystemComponent() const { return AbilitySystemComponent; }
 
 	void SetIsInput(bool isInput);
 	

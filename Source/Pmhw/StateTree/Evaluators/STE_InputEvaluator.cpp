@@ -55,7 +55,8 @@ void FSTE_InputEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 				Data.EvaluatorModel->ActorForwardDirection = CurrentChar->GetActorForwardVector().GetSafeNormal2D();
 				Data.EvaluatorModel->UserInputDirection = MoveComp->GetLastInputVector();
 
-				Data.bHasMovementInput = !InputComp->RawMoveInput.IsNearlyZero();
+				const FVector Acceleration = MoveComp->GetCurrentAcceleration();
+				Data.bHasMovementInput = Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER;
 				Data.GroundVelocity = MoveComp->Velocity.SizeSquared2D();
 				Data.MaxGroundVelocity = MoveComp->MaxWalkSpeed;
 				Data.bHasVelocity = Data.GroundVelocity > 0.01f;
@@ -75,7 +76,6 @@ void FSTE_InputEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 					Data.VelocityLocalAngle = 0.f;
 				}
 
-				FVector Acceleration = MoveComp->GetCurrentAcceleration();
 				if (Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER)
 				{
 					FRotator AccelRot = Acceleration.Rotation();

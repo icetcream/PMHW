@@ -67,6 +67,12 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	float  TurnPercent = 0.f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Locomotion|Movement")
+	float MaxWalkSpeedScale = 1.0f;
+
+	UFUNCTION(BlueprintCallable, Category = "Locomotion|Movement")
+	void SetMaxWalkSpeedScale(float InScale) { MaxWalkSpeedScale = FMath::Max(0.0f, InScale); }
 protected:
 	FMHWCharacterGroundInfo CachedGroundInfo;
 	

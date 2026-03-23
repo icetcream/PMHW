@@ -15,6 +15,7 @@ EStateTreeRunStatus FMHWTurnMovementTask::EnterState(FStateTreeExecutionContext&
 			InputModel,
 			InstanceData.RotationTickRLerpSpeed,
 			InstanceData.RotationTargetConstantLerpSpeed);
+
 		InstanceData.TurnCurrentTime = 0.0f;
 		InputModel->MovementComponent->TurnPercent = 0.0f;
 	}

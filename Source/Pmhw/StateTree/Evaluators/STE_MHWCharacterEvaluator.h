@@ -20,6 +20,9 @@ struct FSTE_MHWCharacterEvaluator_InstanceData
 
 	UPROPERTY(EditAnywhere, Category = "Output")
 	FGameplayTagContainer CurrentWeaponStateContainer;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bHasMovementInput = false;
 };
 
 USTRUCT(meta = (DisplayName = "MHW Character Evaluator"))
@@ -32,4 +35,3 @@ struct FSTE_MHWCharacterEvaluator : public FStateTreeEvaluatorCommonBase
 
 	virtual void Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
 };
-

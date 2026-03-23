@@ -17,6 +17,7 @@ class UMHWMovementSettings;
 class UMHWAnimInstance;
 class UMotionWarpingComponent;
 class UMeleeTraceComponent;
+class UMHWMovementComponent;
 class UHitboxTraceComponent;
 class UStateTreeComponent;
 class UMHWEquipmentManagerComponent;
@@ -63,6 +64,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
 	void SetRotationInterpolationSettings(float InRotationTickRLerpSpeed, float InRotationTargetConstantLerpSpeed);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
+	void SetBlockRotationByTag(bool bInBlocked);
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Weapon")
 	void SetCurrentWeaponState(FGameplayTag NewWeaponState);
@@ -154,11 +158,20 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation", Transient)
 	float RotationCompensationCurveScale = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation")
+	float MaxRotationCompensationDeltaSpeed = 720.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|Rotation|Debug")
+	bool bDebugRotationCompensationLog = false;
+
 	UPROPERTY(Transient)
 	float LastRotationCompensationCurveValue = 0.0f;
 
 	UPROPERTY(Transient)
 	bool bHasRotationCompensationCurveSample = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|Rotation", Transient)
+	bool bBlockRotationByTag = false;
 	
 	// 用于落地时增加摩擦力的计时器 (如果你不做落地打滑的处理，这个也可以删掉)
 	FTimerHandle BrakingFrictionFactorResetTimer;
@@ -167,6 +180,9 @@ protected:
 	FGameplayTag CurrentWeaponState{MHWWeaponTags::Sheathed};
 	
 	bool CanSprint() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion|Rotation")
+	bool CanRotation() const;
 
 	// 3. 计算本帧允许的最大步态
 	FGameplayTag CalculateMaxAllowedGait() const;
@@ -204,7 +220,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	FGameplayTagContainer CurrentComboState;
-	
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMHWMovementComponent> MHWMovementComponent;
 
 };
 

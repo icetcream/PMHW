@@ -4,11 +4,14 @@
 #include "Character/MHWHeroComponent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "MHWGameplayTags.h"
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
+#include "Character/MHWCharacter.h"
 #include "Character/MHWPawnData.h"
 #include "Character/MHWPawnExtensionComponent.h"
+#include "Character/MHWMovementComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "Data/InputActionMappingAsset.h"
 #include "Input/MHWInputComponent.h"
@@ -132,6 +135,9 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 			}
 		}
 
+		BindMovementBlockMoveTagListener();
+		BindRotationBlockTagListener();
+
 		// Hook up the delegate for all pawns, in case we spectate later
 		/*if (PawnData)
 		{
@@ -143,13 +149,127 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 	}
 }
 
+void UMHWHeroComponent::BindMovementBlockMoveTagListener()
+{
+	if (bMovementBlockMoveTagListenerBound)
+	{
+		UpdateMaxWalkSpeedScaleFromTags();
+		return;
+	}
+
+	APawn* Pawn = GetPawn<APawn>();
+	if (!Pawn)
+	{
+		return;
+	}
+
+	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+	{
+		if (UMHWAbilitySystemComponent* ASC = PawnExtComp->GetMHWAbilitySystemComponent())
+		{
+			CachedAbilitySystem = ASC;
+			MovementBlockMoveTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Movement_BlockMove, EGameplayTagEventType::NewOrRemoved)
+				.AddUObject(this,&ThisClass::OnMovementBlockMoveTagChanged);
+			bMovementBlockMoveTagListenerBound = true;
+			UpdateMaxWalkSpeedScaleFromTags();
+		}
+	}
+}
+
+void UMHWHeroComponent::UpdateMaxWalkSpeedScaleFromTags()
+{
+	APawn* Pawn = GetPawn<APawn>();
+	UMHWAbilitySystemComponent* ASC = CachedAbilitySystem.Get();
+	if (!Pawn || !ASC)
+	{
+		return;
+	}
+
+	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
+	UMHWMovementComponent* MoveComp = Character ? Cast<UMHWMovementComponent>(Character->GetCharacterMovement()) : nullptr;
+	if (!MoveComp)
+	{
+		return;
+	}
+
+	const bool bBlockMove = ASC->HasMatchingGameplayTag(MHWStateTags::Movement_BlockMove);
+	MoveComp->SetMaxWalkSpeedScale(bBlockMove ? 0.0f : 1.0f);
+}
+
+void UMHWHeroComponent::OnMovementBlockMoveTagChanged([[maybe_unused]] const FGameplayTag CallbackTag, int32 NewCount)
+{
+	
+	APawn* Pawn = GetPawn<APawn>();
+	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
+	UMHWMovementComponent* MoveComp = Character ? Cast<UMHWMovementComponent>(Character->GetCharacterMovement()) : nullptr;
+	if (!MoveComp)
+	{
+		return;
+	}
+
+	MoveComp->SetMaxWalkSpeedScale(NewCount > 0 ? 0.0f : 1.0f);
+}
+
+void UMHWHeroComponent::BindRotationBlockTagListener()
+{
+	if (bRotationBlockTagListenerBound)
+	{
+		UpdateBlockRotationFromTags();
+		return;
+	}
+
+	APawn* Pawn = GetPawn<APawn>();
+	if (!Pawn)
+	{
+		return;
+	}
+
+	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+	{
+		if (UMHWAbilitySystemComponent* ASC = PawnExtComp->GetMHWAbilitySystemComponent())
+		{
+			CachedAbilitySystem = ASC;
+			RotationBlockTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Rotation_BlockRotation, EGameplayTagEventType::NewOrRemoved)
+				.AddUObject(this,&ThisClass::OnRotationBlockTagChanged);
+			bRotationBlockTagListenerBound = true;
+			UpdateBlockRotationFromTags();
+		}
+	}
+}
+
+void UMHWHeroComponent::UpdateBlockRotationFromTags()
+{
+	APawn* Pawn = GetPawn<APawn>();
+	UMHWAbilitySystemComponent* ASC = CachedAbilitySystem.Get();
+	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
+	if (!ASC || !Character)
+	{
+		return;
+	}
+
+	const bool bBlockRotation = ASC->HasMatchingGameplayTag(MHWStateTags::Rotation_BlockRotation);
+	Character->SetBlockRotationByTag(bBlockRotation);
+}
+
+void UMHWHeroComponent::OnRotationBlockTagChanged([[maybe_unused]] const FGameplayTag CallbackTag, int32 NewCount)
+{
+	APawn* Pawn = GetPawn<APawn>();
+	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
+	if (!Character)
+	{
+		return;
+	}
+
+	Character->SetBlockRotationByTag(NewCount > 0);
+}
+
 void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
 {
 	if (APawn* Pawn = GetPawn<APawn>())
 	{
 		if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 		{
-			if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetLyraAbilitySystemComponent())
+			if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetMHWAbilitySystemComponent())
 			{
 				MHWASC->AbilityInputTagPressed(InputTag);
 			}
@@ -182,7 +302,7 @@ void UMHWHeroComponent::Input_AbilityInputTagHold(FGameplayTag InputTag)
 
 	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 	{
-		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetLyraAbilitySystemComponent())
+		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetMHWAbilitySystemComponent())
 		{
 			MHWASC->AbilityInputTagHolded(InputTag);
 		}
@@ -215,7 +335,7 @@ void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
 
 	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 	{
-		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetLyraAbilitySystemComponent())
+		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetMHWAbilitySystemComponent())
 		{
 			MHWASC->AbilityInputTagReleased(InputTag);
 		}

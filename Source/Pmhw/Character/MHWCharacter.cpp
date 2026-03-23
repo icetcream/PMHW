@@ -42,6 +42,7 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 void AMHWCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
+	MHWMovementComponent = Cast<UMHWMovementComponent>(GetCharacterMovement());
 
 	if (MHWPawnExtensionComponent)
 	{
@@ -191,6 +192,11 @@ void AMHWCharacter::SetRotationInterpolationSettings(float InRotationTickRLerpSp
 	RotationTargetConstantLerpSpeed = FMath::Max(0.0f, InRotationTargetConstantLerpSpeed);
 }
 
+void AMHWCharacter::SetBlockRotationByTag(bool bInBlocked)
+{
+	bBlockRotationByTag = bInBlocked;
+}
+
 bool AMHWCharacter::AddOrUpdateMovementSettingsForWeaponState(FGameplayTag WeaponState, const FMHWMovementRotationModeSettings& InSettings)
 {
 	if (!MovementSettings || !WeaponState.IsValid())
@@ -235,6 +241,21 @@ bool AMHWCharacter::CanSprint() const
 	return true;
 }
 
+bool AMHWCharacter::CanRotation() const
+{
+	if (bBlockRotationByTag)
+	{
+		return false;
+	}
+
+	if (HasAnyRootMotion())
+	{
+		return false;
+	}
+
+	return true;
+}
+
 FGameplayTag AMHWCharacter::CalculateMaxAllowedGait() const
 {
 	if (DesiredGait != MHWGaitTags::Sprinting)
@@ -254,7 +275,11 @@ FGameplayTag AMHWCharacter::CalculateMaxAllowedGait() const
 
 void AMHWCharacter::RefreshInput()
 {
-	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	UMHWMovementComponent* MoveComp = MHWMovementComponent.Get();
+	if (!MoveComp)
+	{
+		MoveComp = Cast<UMHWMovementComponent>(GetCharacterMovement());
+	}
 	if (!MoveComp) return;
 
 	// 获取当前玩家的输入加速度方向 (归一化向量)
@@ -324,7 +349,11 @@ float AMHWCharacter::CalculateGaitAmount() const
 
 void AMHWCharacter::RefreshMovementPhysics()
 {
-	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	UMHWMovementComponent* MoveComp = MHWMovementComponent.Get();
+	if (!MoveComp)
+	{
+		MoveComp = Cast<UMHWMovementComponent>(GetCharacterMovement());
+	}
 	if (!MoveComp) return;
 
 	// 2. 获取当前状态下（武器 + 旋转模式 + 姿态）真正生效的那组移动配置
@@ -361,15 +390,15 @@ void AMHWCharacter::RefreshMovementPhysics()
 
 	if (MaxAllowedGait == MHWGaitTags::Sprinting)
 	{
-		MoveComp->MaxWalkSpeed = CurrentSettings->SprintSpeed;
+		MoveComp->MaxWalkSpeed = CurrentSettings->SprintSpeed * MoveComp->MaxWalkSpeedScale;
 	}
 	else if (MaxAllowedGait == MHWGaitTags::Running)
 	{
-		MoveComp->MaxWalkSpeed = CurrentSettings->RunSpeed;
+		MoveComp->MaxWalkSpeed = CurrentSettings->RunSpeed * MoveComp->MaxWalkSpeedScale;
 	}
 	else // 如果是 MHWGaitTags::Walking 或者其他情况
 	{
-		MoveComp->MaxWalkSpeed = CurrentSettings->WalkSpeed;
+		MoveComp->MaxWalkSpeed = CurrentSettings->WalkSpeed * MoveComp->MaxWalkSpeedScale;
 	}
 
 	// ==========================================
@@ -408,10 +437,32 @@ void AMHWCharacter::RefreshLocomotion()
 
 void AMHWCharacter::SmoothTickRotation(float DeltaTime)
 {
-	const FRotator CurrentRotation = GetActorRotation();
+	auto ResetCurveSampling = [this]()
+	{
+		bHasRotationCompensationCurveSample = false;
+		LastRotationCompensationCurveValue = 0.0f;
+	};
 
-	// Build TargetRotation from acceleration yaw and current facing using constant lerp.
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	if (!CanRotation())
+	{
+		// Root motion phase should own rotation. Reset curve sampling to avoid re-enable spikes.
+		ResetCurveSampling();
+		return;
+	}
+
+	const FRotator CurrentRotation = GetActorRotation();
+	float DebugCurrentCurveValue = 0.0f;
+	float DebugCurveRawDelta = 0.0f;
+	float DebugCurveClampedDelta = 0.0f;
+	bool bDebugUsingCurve = false;
+
+	// 1) Build target yaw from acceleration using constant turn speed.
+	UMHWMovementComponent* MoveComp = MHWMovementComponent.Get();
+	if (!MoveComp)
+	{
+		MoveComp = Cast<UMHWMovementComponent>(GetCharacterMovement());
+	}
+	if (MoveComp)
 	{
 		const FVector CurrentAcceleration = MoveComp->GetCurrentAcceleration();
 		if (CurrentAcceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER)
@@ -424,24 +475,37 @@ void AMHWCharacter::SmoothTickRotation(float DeltaTime)
 		}
 	}
 
+	// 2) Smooth final actor yaw by RLerp shortest path.
 	const FRotator TargetRotation(0.0f, LocomotionState.SmoothTargetYawAngle, 0.0f);
-	const float Alpha = FMath::Clamp(RotationTickRLerpSpeed * DeltaTime, 0.0f, 1.0f);
-	const FRotator ResultRotation = UKismetMathLibrary::RLerp(CurrentRotation, TargetRotation, Alpha, true);
+	const float RotationAlpha = FMath::Clamp(RotationTickRLerpSpeed * DeltaTime, 0.0f, 1.0f);
+	const FRotator SmoothedRotation = UKismetMathLibrary::RLerp(CurrentRotation, TargetRotation, RotationAlpha, true);
 
+	// 3) Optional curve delta compensation.
 	float CurveRotationCompensation = 0.0f;
-	if (bEnableRotationCurveCompensation && !RotationCompensationCurveName.IsNone() && AnimationInstance.IsValid())
+	const bool bCanUseCurveCompensation =
+		bEnableRotationCurveCompensation &&
+		!RotationCompensationCurveName.IsNone() &&
+		AnimationInstance.IsValid();
+	if (bCanUseCurveCompensation)
 	{
-		const float CurrentCurveValue =
-			AnimationInstance->GetCurveValue(RotationCompensationCurveName) * RotationCompensationCurveScale;
+		const float CurrentCurveValue = FMath::UnwindDegrees(
+			AnimationInstance->GetCurveValue(RotationCompensationCurveName) * RotationCompensationCurveScale);
+		DebugCurrentCurveValue = CurrentCurveValue;
+		bDebugUsingCurve = true;
 
 		if (bHasRotationCompensationCurveSample)
 		{
-			// Apply curve delta only, not absolute value, to avoid spinning accumulation.
-			CurveRotationCompensation = CurrentCurveValue - LastRotationCompensationCurveValue;
+			// Use shortest-angle delta and clamp by per-second speed to avoid large blend spikes.
+			const float RawDelta = FMath::FindDeltaAngleDegrees(
+				LastRotationCompensationCurveValue,
+				CurrentCurveValue);
+			const float MaxDeltaThisFrame = FMath::Max(0.0f, MaxRotationCompensationDeltaSpeed) * DeltaTime;
+			CurveRotationCompensation = FMath::Clamp(RawDelta, -MaxDeltaThisFrame, MaxDeltaThisFrame);
+			DebugCurveRawDelta = RawDelta;
+			DebugCurveClampedDelta = CurveRotationCompensation;
 		}
 		else
 		{
-			// First sample: establish baseline and apply no delta this frame.
 			CurveRotationCompensation = 0.0f;
 			bHasRotationCompensationCurveSample = true;
 		}
@@ -450,13 +514,26 @@ void AMHWCharacter::SmoothTickRotation(float DeltaTime)
 	}
 	else
 	{
-		bHasRotationCompensationCurveSample = false;
-		LastRotationCompensationCurveValue = 0.0f;
+		ResetCurveSampling();
 	}
 
 	FRotator NewRotation = CurrentRotation;
-	NewRotation.Yaw = FMath::UnwindDegrees(ResultRotation.Yaw + CurveRotationCompensation);
+	NewRotation.Yaw = FMath::UnwindDegrees(SmoothedRotation.Yaw + CurveRotationCompensation);
 	SetActorRotation(NewRotation);
+
+	if (bDebugRotationCompensationLog)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[RotComp] UsingCurve=%d Curve=%s CurrentCurve=%.2f RawDelta=%.2f ClampedDelta=%.2f TargetYaw=%.2f ResultYaw=%.2f FinalYaw=%.2f"),
+			bDebugUsingCurve ? 1 : 0,
+			*RotationCompensationCurveName.ToString(),
+			DebugCurrentCurveValue,
+			DebugCurveRawDelta,
+			DebugCurveClampedDelta,
+			LocomotionState.SmoothTargetYawAngle,
+			SmoothedRotation.Yaw,
+			NewRotation.Yaw);
+	}
 }
 
 void AMHWCharacter::RefreshGait()

@@ -19,16 +19,20 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 	Character->StopAnimMontage();
 
 	InstanceData.CurrentTurnYaw = 0.0f;
+	InstanceData.CurrentChargeTime = 0.0f;
+	InstanceData.bOwnsSpecificChargeTag = false;
 
 	// 【添加具体的蓄力 Tag】
 	// 如果你填的是 State.Combat.Charging.Level2，角色身上就会有这个 Tag。
 	// 根据 GAS 规则，拥有子 Tag 等同于拥有父 Tag (State.Combat.Charging)。
 	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Character))
 	{
-		// 注意：使用 AddLooseGameplayTag，这是给外部系统(如 StateTree)直接改状态用的
-		ASC->AddLooseGameplayTag(SpecificChargeTag);
-		ASC->AddLooseGameplayTag(MHWStateTags::Movement_BlockInput);
-		ASC->AddLooseGameplayTag(MHWStateTags::Rotation_BlockInput);
+		// 只在本任务需要时添加，并记录所有权，退出时只清理自己加的标签
+		if (SpecificChargeTag.IsValid() && !ASC->HasMatchingGameplayTag(SpecificChargeTag))
+		{
+			ASC->AddLooseGameplayTag(SpecificChargeTag);
+			InstanceData.bOwnsSpecificChargeTag = true;
+		}
 	}
 
 	return EStateTreeRunStatus::Running;
@@ -113,9 +117,10 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 		// 必须保证退出时清理干净，否则角色的动画会被卡死在蓄力状态里
 		if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Character))
 		{
-			ASC->RemoveLooseGameplayTag(SpecificChargeTag);
-			ASC->RemoveLooseGameplayTag(MHWStateTags::Movement_BlockInput);
-			ASC->RemoveLooseGameplayTag(MHWStateTags::Rotation_BlockInput);
+			if (InstanceData.bOwnsSpecificChargeTag && SpecificChargeTag.IsValid())
+			{
+				ASC->RemoveLooseGameplayTag(SpecificChargeTag);
+			}
 		}
 
 		if (FMath::Abs(InstanceData.CurrentTurnYaw) > KINDA_SMALL_NUMBER)
@@ -147,4 +152,7 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 			WarpingComp->AddOrUpdateWarpTargetFromTransform(FName("ChargeSmashTarget"), TargetTransform);
 		}
 	}
+
+	InstanceData.CurrentChargeTime = 0.0f;
+	InstanceData.bOwnsSpecificChargeTag = false;
 }

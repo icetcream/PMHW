@@ -68,4 +68,7 @@ private:
 
 	// 一个辅助函数，用于在 Tag 变化时重新计算当前处于哪种枚举状态
 	void UpdateChargingTypeFromTags();
+
+	// 清理 ASC 标签监听，避免重复绑定和悬挂委托
+	void UnbindFromAbilitySystem();
 };

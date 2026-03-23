@@ -16,6 +16,8 @@ struct FSTT_GreatSwordChargeInstanceData
 	float CurrentTurnYaw = 0.0f;
 	
 	float CurrentChargeTime = 0.0f;
+
+	bool bOwnsSpecificChargeTag = false;
 };
 
 USTRUCT(meta = (DisplayName = "Great Sword Charge Task (Dynamic Tag)"))

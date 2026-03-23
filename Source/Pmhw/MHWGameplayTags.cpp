@@ -44,8 +44,8 @@ namespace MHWStateTags
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Charging_XLZ, "State.Combat.Charging.XLZ");
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Charging_XLZ2, "State.Combat.Charging.XLZ2");
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Charging_XLZ3, "State.Combat.Charging.XLZ3");
-	UE_DEFINE_GAMEPLAY_TAG(Rotation_BlockInput, "State.Rotation.BlockInput");
-	UE_DEFINE_GAMEPLAY_TAG(Movement_BlockInput, "State.Movement.BlockInput");
+	UE_DEFINE_GAMEPLAY_TAG(Rotation_BlockRotation, "State.Rotation.BlockRotation");
+	UE_DEFINE_GAMEPLAY_TAG(Movement_BlockMove, "State.Movement.BlockMove");
 	
 	// --- Msg ---
 	UE_DEFINE_GAMEPLAY_TAG(Locomotion_Idle, "State.Locomotion.Idle");
