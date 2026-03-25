@@ -10,6 +10,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Interface/CombatAnimInterface.h"
 
+namespace GreatSwordChargeTask
+{
+	static const FName ChargeSmashTargetName(TEXT("ChargeSmashTarget"));
+}
+
 EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FSTT_GreatSwordChargeInstanceData& InstanceData = Context.GetInstanceData<FSTT_GreatSwordChargeInstanceData>(*this);
@@ -17,6 +22,11 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 	if (!Character) return EStateTreeRunStatus::Failed;
 	
 	Character->StopAnimMontage();
+
+	if (UMotionWarpingComponent* WarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+	{
+		WarpingComp->RemoveWarpTarget(GreatSwordChargeTask::ChargeSmashTargetName);
+	}
 
 	InstanceData.CurrentTurnYaw = 0.0f;
 	InstanceData.CurrentChargeTime = 0.0f;
@@ -95,11 +105,14 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::Tick(FStateTreeExecutionContext& Cont
 
 	// ===================== 将角度传给 AnimBP =====================
 	
-	if (UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance())
+	if (USkeletalMeshComponent* MeshComp = Character->GetMesh())
 	{
-		if (AnimInstance->Implements<UCombatAnimInterface>())
+		if (UAnimInstance* AnimInstance = MeshComp->GetAnimInstance())
 		{
-			ICombatAnimInterface::Execute_SetChargeTurnYaw(AnimInstance, InstanceData.CurrentTurnYaw);
+			if (AnimInstance->Implements<UCombatAnimInterface>())
+			{
+				ICombatAnimInterface::Execute_SetChargeTurnYaw(AnimInstance, InstanceData.CurrentTurnYaw);
+			}
 		}
 	}
 	
@@ -125,22 +138,27 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 
 		if (FMath::Abs(InstanceData.CurrentTurnYaw) > KINDA_SMALL_NUMBER)
 		{
-			if (UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance())
+			if (USkeletalMeshComponent* MeshComp = Character->GetMesh())
 			{
-				if (AnimInstance->Implements<UCombatAnimInterface>())
+				if (UAnimInstance* AnimInstance = MeshComp->GetAnimInstance())
 				{
-					ICombatAnimInterface::Execute_SetChargeTurnYaw(AnimInstance, 0.0f);
+					if (AnimInstance->Implements<UCombatAnimInterface>())
+					{
+						ICombatAnimInterface::Execute_SetChargeTurnYaw(AnimInstance, 0.0f);
+					}
 				}
 			}
 		}
-		UMotionWarpingComponent* WarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>();
-		
-		if (WarpingComp && FMath::Abs(InstanceData.CurrentTurnYaw) > KINDA_SMALL_NUMBER)
+
+		if (UMotionWarpingComponent* WarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
 		{
+			WarpingComp->RemoveWarpTarget(GreatSwordChargeTask::ChargeSmashTargetName);
+
 			// a. 计算出我们期望下砸的最终朝向
 			FRotator CurrentActorRot = Character->GetActorRotation();
 			FRotator TargetRot = CurrentActorRot;
 			TargetRot.Yaw += InstanceData.CurrentTurnYaw;
+			TargetRot.Normalize();
 
 			// b. 构造一个目标 Transform (位置保持不变，只转朝向)
 			FTransform TargetTransform;
@@ -149,7 +167,10 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 
 			// c. 【神之一手】将这个目标喂给 Motion Warping 组件！
 			// "ChargeSmashTarget" 是我们随便起的一个名字，记好它，等会要在 Montage 里填！
-			WarpingComp->AddOrUpdateWarpTargetFromTransform(FName("ChargeSmashTarget"), TargetTransform);
+			if (bUseMotiongWarping)
+			{
+				WarpingComp->AddOrUpdateWarpTargetFromTransform(GreatSwordChargeTask::ChargeSmashTargetName, TargetTransform);
+			}
 		}
 	}
 

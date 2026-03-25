@@ -45,6 +45,9 @@ struct PMHW_API FSTT_GreatSwordCharge : public FStateTreeTaskCommonBase
 	
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	float MaxChargeDuration = 2.5f;
+	
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	bool bUseMotiongWarping = true;
 
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;

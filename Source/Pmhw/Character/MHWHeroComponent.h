@@ -60,19 +60,14 @@ protected:
 	
 	void Input_Move(const FInputActionValue& InputActionValue);
 	void Input_LookMouse(const FInputActionValue& InputActionValue);
-	void Input_LookStick(const FInputActionValue& InputActionValue);
-	void Input_Crouch(const FInputActionValue& InputActionValue);
-	void Input_AutoRun(const FInputActionValue& InputActionValue);
+	void Input_Sprint(const FInputActionValue& InputActionValue);
 	
-	void SendInputEventToStateTree(FGameplayTag InputTag, APawn* Pawn, FName SuffixName);
 	
 	UMHWInputComponent* GetMHWInputComponent();
-	void BindMovementBlockMoveTagListener();
-	void UpdateMaxWalkSpeedScaleFromTags();
-	void OnMovementBlockMoveTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
-	void BindRotationBlockTagListener();
-	void UpdateBlockRotationFromTags();
-	void OnRotationBlockTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void BindAllObservedTagListeners();
+	void BindObservedTagListener(const FGameplayTag TagToObserve, FDelegateHandle& DelegateHandle, bool& bListenerBound);
+	void ApplyObservedTagStates();
+	void OnObservedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
 	UPROPERTY(EditDefaultsOnly, Category = "MHW|Input")
 	TArray<FInputMappingContextAndPriority> DefaultInputMappings;

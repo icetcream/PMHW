@@ -14,6 +14,8 @@ void FSTE_MHWCharacterEvaluator::Tick(FStateTreeExecutionContext& Context, const
 	{
 		Data.CurrentWeaponState = FGameplayTag();
 		Data.bHasMovementInput = false;
+		Data.bHasVelocity = false;
+		Data.AccelerationFacingTransform = FTransform::Identity;
 		return;
 	}
 
@@ -25,10 +27,26 @@ void FSTE_MHWCharacterEvaluator::Tick(FStateTreeExecutionContext& Context, const
 
 	if (const UCharacterMovementComponent* MoveComp = Data.Character->GetCharacterMovement())
 	{
-		Data.bHasMovementInput = MoveComp->GetCurrentAcceleration().SizeSquared2D() > UE_KINDA_SMALL_NUMBER;
+		const FVector CurrentAcceleration = MoveComp->GetCurrentAcceleration();
+		Data.bHasMovementInput = CurrentAcceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER;
+		Data.bHasVelocity = MoveComp->Velocity.SizeSquared2D() > UE_KINDA_SMALL_NUMBER;
+
+		FRotator FacingRot = Data.Character->GetActorRotation();
+		if (Data.bHasMovementInput)
+		{
+			FacingRot = CurrentAcceleration.GetSafeNormal2D().Rotation();
+		}
+
+		Data.AccelerationFacingTransform.SetLocation(Data.Character->GetActorLocation());
+		Data.AccelerationFacingTransform.SetRotation(FacingRot.Quaternion());
+		Data.AccelerationFacingTransform.SetScale3D(FVector::OneVector);
 	}
 	else
 	{
 		Data.bHasMovementInput = false;
+		Data.bHasVelocity = false;
+		Data.AccelerationFacingTransform.SetLocation(Data.Character->GetActorLocation());
+		Data.AccelerationFacingTransform.SetRotation(Data.Character->GetActorRotation().Quaternion());
+		Data.AccelerationFacingTransform.SetScale3D(FVector::OneVector);
 	}
 }

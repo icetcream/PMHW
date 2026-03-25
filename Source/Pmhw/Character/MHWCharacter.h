@@ -52,6 +52,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion")
 	void SetDesiredGait(FGameplayTag NewDesiredGait);
 
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion")
+	FGameplayTag GetDesiredGait() const { return DesiredGait; }
+
 	// Rotation data writer for StateTree tasks.
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
 	void SetTargetYawAngle(float TargetYawAngle);
@@ -66,13 +69,25 @@ public:
 	void SetRotationInterpolationSettings(float InRotationTickRLerpSpeed, float InRotationTargetConstantLerpSpeed);
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
-	void SetBlockRotationByTag(bool bInBlocked);
+	void SetBlockRotation(bool bInBlocked);
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion|Rotation")
+	bool IsBlockRotation() const { return bBlockRotation; }
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat|Defense")
+	void SetDefenseActive(bool bInActive);
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat|Defense")
+	bool IsDefenseActive() const { return bDefenseActive; }
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Weapon")
 	void SetCurrentWeaponState(FGameplayTag NewWeaponState);
 
 	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion|Weapon")
 	FGameplayTag GetCurrentWeaponState() const { return CurrentWeaponState; }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion|State")
+	FGameplayTag GetCurrentGait() const { return Gait; }
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Settings")
 	bool AddOrUpdateMovementSettingsForWeaponState(FGameplayTag WeaponState, const FMHWMovementRotationModeSettings& InSettings);
@@ -171,7 +186,10 @@ protected:
 	bool bHasRotationCompensationCurveSample = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|Rotation", Transient)
-	bool bBlockRotationByTag = false;
+	bool bBlockRotation = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Combat|Defense", Transient)
+	bool bDefenseActive = false;
 	
 	// 用于落地时增加摩擦力的计时器 (如果你不做落地打滑的处理，这个也可以删掉)
 	FTimerHandle BrakingFrictionFactorResetTimer;

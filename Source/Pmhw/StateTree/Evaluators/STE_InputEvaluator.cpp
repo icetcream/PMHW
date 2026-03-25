@@ -28,6 +28,7 @@ void FSTE_InputEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 			if (const AMHWCharacter* MHWCharacter = Cast<AMHWCharacter>(CurrentChar))
 			{
 				Data.CurrentWeaponState = MHWCharacter->GetCurrentWeaponState();
+				Data.CurrentGait = MHWCharacter->GetCurrentGait();
 				Data.EvaluatorModel->CurrentWeaponState = Data.CurrentWeaponState;
 				Data.CurrentWeaponStateContainer.Reset();
 				if (Data.CurrentWeaponState.IsValid())
@@ -39,6 +40,7 @@ void FSTE_InputEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 			else
 			{
 				Data.CurrentWeaponState = FGameplayTag();
+				Data.CurrentGait = FGameplayTag();
 				Data.EvaluatorModel->CurrentWeaponState = FGameplayTag();
 				Data.CurrentWeaponStateContainer.Reset();
 				Data.EvaluatorModel->CurrentWeaponStateContainer.Reset();
@@ -56,8 +58,10 @@ void FSTE_InputEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 				Data.EvaluatorModel->UserInputDirection = MoveComp->GetLastInputVector();
 
 				const FVector Acceleration = MoveComp->GetCurrentAcceleration();
+				Data.CurrentAcceleration = Acceleration;
 				Data.bHasMovementInput = Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER;
 				Data.GroundVelocity = MoveComp->Velocity.SizeSquared2D();
+				Data.Velocity2D = MoveComp->Velocity.Size2D();
 				Data.MaxGroundVelocity = MoveComp->MaxWalkSpeed;
 				Data.bHasVelocity = Data.GroundVelocity > 0.01f;
 				Data.bIsFalling = MoveComp->IsFalling();
@@ -96,9 +100,14 @@ void FSTE_InputEvaluator::Tick(FStateTreeExecutionContext& Context, const float 
 			Data.bHasMovementInput = false;
 			Data.bIsFalling = false;
 			Data.bHasVelocity = false;
+			Data.GroundVelocity = 0.f;
+			Data.MaxGroundVelocity = 0.f;
+			Data.Velocity2D = 0.f;
+			Data.CurrentAcceleration = FVector::ZeroVector;
 			Data.VelocityLocalAngle = 0.f;
 			Data.AccelerationLocalAngle = 0.f;
 			Data.CurrentWeaponState = FGameplayTag();
+			Data.CurrentGait = FGameplayTag();
 			Data.EvaluatorModel->CurrentWeaponState = FGameplayTag();
 			Data.CurrentWeaponStateContainer.Reset();
 			Data.EvaluatorModel->CurrentWeaponStateContainer.Reset();

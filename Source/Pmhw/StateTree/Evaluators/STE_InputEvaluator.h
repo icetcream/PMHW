@@ -32,9 +32,15 @@ struct FSTE_InputEvaluator_InstanceData
 	
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float GroundVelocity = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	float Velocity2D = 0.f;
 	
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float MaxGroundVelocity = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	FVector CurrentAcceleration = FVector::ZeroVector;
 	
 	UPROPERTY(EditAnywhere, Category = "Output")
 	float VelocityLocalAngle = 0.f;
@@ -51,6 +57,9 @@ struct FSTE_InputEvaluator_InstanceData
 
 	UPROPERTY(EditAnywhere, Category = "Output")
 	FGameplayTagContainer CurrentWeaponStateContainer;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	FGameplayTag CurrentGait;
 };
 
 // ==========================================

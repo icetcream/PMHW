@@ -23,6 +23,13 @@ struct FSTE_MHWCharacterEvaluator_InstanceData
 
 	UPROPERTY(EditAnywhere, Category = "Output")
 	bool bHasMovementInput = false;
+
+	UPROPERTY(EditAnywhere, Category = "Output")
+	bool bHasVelocity = false;
+
+	// 基于当前加速度方向生成的朝向 Transform（位置为角色当前位置）
+	UPROPERTY(EditAnywhere, Category = "Output")
+	FTransform AccelerationFacingTransform = FTransform::Identity;
 };
 
 USTRUCT(meta = (DisplayName = "MHW Character Evaluator"))

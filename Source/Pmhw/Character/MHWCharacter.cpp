@@ -192,9 +192,14 @@ void AMHWCharacter::SetRotationInterpolationSettings(float InRotationTickRLerpSp
 	RotationTargetConstantLerpSpeed = FMath::Max(0.0f, InRotationTargetConstantLerpSpeed);
 }
 
-void AMHWCharacter::SetBlockRotationByTag(bool bInBlocked)
+void AMHWCharacter::SetBlockRotation(bool bInBlocked)
 {
-	bBlockRotationByTag = bInBlocked;
+	bBlockRotation = bInBlocked;
+}
+
+void AMHWCharacter::SetDefenseActive(bool bInActive)
+{
+	bDefenseActive = bInActive;
 }
 
 bool AMHWCharacter::AddOrUpdateMovementSettingsForWeaponState(FGameplayTag WeaponState, const FMHWMovementRotationModeSettings& InSettings)
@@ -243,7 +248,7 @@ bool AMHWCharacter::CanSprint() const
 
 bool AMHWCharacter::CanRotation() const
 {
-	if (bBlockRotationByTag)
+	if (bBlockRotation)
 	{
 		return false;
 	}
@@ -447,6 +452,12 @@ void AMHWCharacter::SmoothTickRotation(float DeltaTime)
 	{
 		// Root motion phase should own rotation. Reset curve sampling to avoid re-enable spikes.
 		ResetCurveSampling();
+
+		// Keep rotation targets aligned with the current actor yaw while rotation is blocked,
+		// so we do not snap to a stale target when rotation gets re-enabled.
+		const float CurrentYaw = FMath::UnwindDegrees(GetActorRotation().Yaw);
+		LocomotionState.TargetYawAngle = CurrentYaw;
+		LocomotionState.SmoothTargetYawAngle = CurrentYaw;
 		return;
 	}
 

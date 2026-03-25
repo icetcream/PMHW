@@ -11,16 +11,16 @@ namespace MHWInputTags
 	// --- Input ---
 	UE_DEFINE_GAMEPLAY_TAG(Move, "InputTag.Move");
 	UE_DEFINE_GAMEPLAY_TAG(Look_Mouse, "InputTag.Look_Mouse");
-	UE_DEFINE_GAMEPLAY_TAG(Look_Stick, "InputTag.Look_Stick");
-	UE_DEFINE_GAMEPLAY_TAG(Crouch, "InputTag.Crouch");
-	UE_DEFINE_GAMEPLAY_TAG(AutoRun, "InputTag.AutoRun");
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_ToggleDraw, "InputTag.ToggleDraw");
+	UE_DEFINE_GAMEPLAY_TAG(LeftShift, "InputTag.LeftShift");
 	
 	DEFINE_INPUT_TAG_SET(PrimaryAttack, "InputTag.PrimaryAttack");
 	DEFINE_INPUT_TAG_SET(SecondaryAttack, "InputTag.SecondaryAttack");
 	DEFINE_INPUT_TAG_SET(SpecialAction, "InputTag.SpecialAction");
+	DEFINE_INPUT_TAG_SET(SpecialAction2, "InputTag.SpecialAction2");
 	DEFINE_INPUT_TAG_SET(Roll, "InputTag.Roll");
-	
+	DEFINE_INPUT_TAG_SET(Defense, "InputTag.Defense");
+	DEFINE_INPUT_TAG_SET(QHSJ, "InputTag.QHSJ");
 }
 
 namespace MHWInitStateTags
@@ -40,6 +40,7 @@ namespace MHWStateTags
 	UE_DEFINE_GAMEPLAY_TAG(IsMoving, "State.IsMoving");
 	
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Drawn, "State.Combat.Drawn");
+	UE_DEFINE_GAMEPLAY_TAG(Combat_Defense, "State.Combat.Defense");
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Charging, "State.Combat.Charging");
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Charging_XLZ, "State.Combat.Charging.XLZ");
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Charging_XLZ2, "State.Combat.Charging.XLZ2");

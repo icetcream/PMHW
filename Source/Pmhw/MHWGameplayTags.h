@@ -13,18 +13,17 @@ namespace MHWInputTags
 	// --- 输入相关标签 (Input Tags) ---
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Move);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Look_Mouse);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Look_Stick);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Crouch);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AutoRun);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Weapon_ToggleDraw);
-	
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(LeftShift);
 	
 	
 	DECLARE_INPUT_TAG_SET(PrimaryAttack);   // 比如三角键
 	DECLARE_INPUT_TAG_SET(SecondaryAttack); // 比如圆圈键
 	DECLARE_INPUT_TAG_SET(SpecialAction); // 组合按键
+	DECLARE_INPUT_TAG_SET(SpecialAction2);
 	DECLARE_INPUT_TAG_SET(Roll);
-	
+	DECLARE_INPUT_TAG_SET(Defense);
+	DECLARE_INPUT_TAG_SET(QHSJ);
 }
 
 namespace MHWInitStateTags
@@ -40,6 +39,7 @@ namespace MHWStateTags
 	// --- 初始化相关 ---
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboWindow);   
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Drawn); 
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Defense); 
 	
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Charging);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Charging_XLZ);

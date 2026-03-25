@@ -87,9 +87,9 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Move, ETriggerEvent::Triggered, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Move, ETriggerEvent::Completed, this, &ThisClass::Input_Move, /*bLogIfNotFound=*/ false);
 					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Look_Mouse, ETriggerEvent::Triggered, this, &ThisClass::Input_LookMouse, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Look_Stick, ETriggerEvent::Triggered, this, &ThisClass::Input_LookStick, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWInputTags::Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
-					MHWIC->BindNativeAction(InputConfig, MHWInputTags::AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::LeftShift, ETriggerEvent::Triggered, this, &ThisClass::Input_Sprint, /*bLogIfNotFound=*/ false);
+					MHWIC->BindNativeAction(InputConfig, MHWInputTags::LeftShift, ETriggerEvent::Completed, this, &ThisClass::Input_Sprint, /*bLogIfNotFound=*/ false);
+					
 				}
 			}
 		}
@@ -135,8 +135,7 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 			}
 		}
 
-		BindMovementBlockMoveTagListener();
-		BindRotationBlockTagListener();
+		BindAllObservedTagListeners();
 
 		// Hook up the delegate for all pawns, in case we spectate later
 		/*if (PawnData)
@@ -149,11 +148,17 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 	}
 }
 
-void UMHWHeroComponent::BindMovementBlockMoveTagListener()
+void UMHWHeroComponent::BindAllObservedTagListeners()
 {
-	if (bMovementBlockMoveTagListenerBound)
+	BindObservedTagListener(MHWStateTags::Movement_BlockMove, MovementBlockMoveTagDelegateHandle, bMovementBlockMoveTagListenerBound);
+	BindObservedTagListener(MHWStateTags::Rotation_BlockRotation, RotationBlockTagDelegateHandle, bRotationBlockTagListenerBound);
+	ApplyObservedTagStates();
+}
+
+void UMHWHeroComponent::BindObservedTagListener(const FGameplayTag TagToObserve, FDelegateHandle& DelegateHandle, bool& bListenerBound)
+{
+	if (bListenerBound)
 	{
-		UpdateMaxWalkSpeedScaleFromTags();
 		return;
 	}
 
@@ -168,76 +173,14 @@ void UMHWHeroComponent::BindMovementBlockMoveTagListener()
 		if (UMHWAbilitySystemComponent* ASC = PawnExtComp->GetMHWAbilitySystemComponent())
 		{
 			CachedAbilitySystem = ASC;
-			MovementBlockMoveTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Movement_BlockMove, EGameplayTagEventType::NewOrRemoved)
-				.AddUObject(this,&ThisClass::OnMovementBlockMoveTagChanged);
-			bMovementBlockMoveTagListenerBound = true;
-			UpdateMaxWalkSpeedScaleFromTags();
+			DelegateHandle = ASC->RegisterGameplayTagEvent(TagToObserve, EGameplayTagEventType::NewOrRemoved)
+				.AddUObject(this,&ThisClass::OnObservedTagChanged);
+			bListenerBound = true;
 		}
 	}
 }
 
-void UMHWHeroComponent::UpdateMaxWalkSpeedScaleFromTags()
-{
-	APawn* Pawn = GetPawn<APawn>();
-	UMHWAbilitySystemComponent* ASC = CachedAbilitySystem.Get();
-	if (!Pawn || !ASC)
-	{
-		return;
-	}
-
-	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
-	UMHWMovementComponent* MoveComp = Character ? Cast<UMHWMovementComponent>(Character->GetCharacterMovement()) : nullptr;
-	if (!MoveComp)
-	{
-		return;
-	}
-
-	const bool bBlockMove = ASC->HasMatchingGameplayTag(MHWStateTags::Movement_BlockMove);
-	MoveComp->SetMaxWalkSpeedScale(bBlockMove ? 0.0f : 1.0f);
-}
-
-void UMHWHeroComponent::OnMovementBlockMoveTagChanged([[maybe_unused]] const FGameplayTag CallbackTag, int32 NewCount)
-{
-	
-	APawn* Pawn = GetPawn<APawn>();
-	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
-	UMHWMovementComponent* MoveComp = Character ? Cast<UMHWMovementComponent>(Character->GetCharacterMovement()) : nullptr;
-	if (!MoveComp)
-	{
-		return;
-	}
-
-	MoveComp->SetMaxWalkSpeedScale(NewCount > 0 ? 0.0f : 1.0f);
-}
-
-void UMHWHeroComponent::BindRotationBlockTagListener()
-{
-	if (bRotationBlockTagListenerBound)
-	{
-		UpdateBlockRotationFromTags();
-		return;
-	}
-
-	APawn* Pawn = GetPawn<APawn>();
-	if (!Pawn)
-	{
-		return;
-	}
-
-	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
-	{
-		if (UMHWAbilitySystemComponent* ASC = PawnExtComp->GetMHWAbilitySystemComponent())
-		{
-			CachedAbilitySystem = ASC;
-			RotationBlockTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Rotation_BlockRotation, EGameplayTagEventType::NewOrRemoved)
-				.AddUObject(this,&ThisClass::OnRotationBlockTagChanged);
-			bRotationBlockTagListenerBound = true;
-			UpdateBlockRotationFromTags();
-		}
-	}
-}
-
-void UMHWHeroComponent::UpdateBlockRotationFromTags()
+void UMHWHeroComponent::ApplyObservedTagStates()
 {
 	APawn* Pawn = GetPawn<APawn>();
 	UMHWAbilitySystemComponent* ASC = CachedAbilitySystem.Get();
@@ -247,20 +190,19 @@ void UMHWHeroComponent::UpdateBlockRotationFromTags()
 		return;
 	}
 
-	const bool bBlockRotation = ASC->HasMatchingGameplayTag(MHWStateTags::Rotation_BlockRotation);
-	Character->SetBlockRotationByTag(bBlockRotation);
-}
-
-void UMHWHeroComponent::OnRotationBlockTagChanged([[maybe_unused]] const FGameplayTag CallbackTag, int32 NewCount)
-{
-	APawn* Pawn = GetPawn<APawn>();
-	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
-	if (!Character)
+	if (UMHWMovementComponent* MoveComp = Cast<UMHWMovementComponent>(Character->GetCharacterMovement()))
 	{
-		return;
+		const bool bBlockMove = ASC->HasMatchingGameplayTag(MHWStateTags::Movement_BlockMove);
+		MoveComp->SetMaxWalkSpeedScale(bBlockMove ? 0.0f : 1.0f);
 	}
 
-	Character->SetBlockRotationByTag(NewCount > 0);
+	const bool bBlockRotation = ASC->HasMatchingGameplayTag(MHWStateTags::Rotation_BlockRotation);
+	Character->SetBlockRotation(bBlockRotation);
+}
+
+void UMHWHeroComponent::OnObservedTagChanged([[maybe_unused]] const FGameplayTag CallbackTag, int32 NewCount)
+{
+	ApplyObservedTagStates();
 }
 
 void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
@@ -375,6 +317,15 @@ void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)
 	if (Controller)
 	{
 		const FVector2D Value = InputActionValue.Get<FVector2D>();
+		if (AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn))
+		{
+			if (Character->GetDesiredGait() != MHWGaitTags::Sprinting)
+			{
+				const float MoveInputStrength = Value.Size();
+				Character->SetDesiredGait(MoveInputStrength > 0.5f ? MHWGaitTags::Running : MHWGaitTags::Walking);
+			}
+		}
+
 		const FRotator MovementRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
 		
 		UMHWInputComponent* MHWInputComp = GetMHWInputComponent();
@@ -393,6 +344,27 @@ void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)
 		}
 	}
 	
+}
+
+void UMHWHeroComponent::Input_Sprint(const FInputActionValue& InputActionValue)
+{
+	APawn* Pawn = GetPawn<APawn>();
+	AMHWCharacter* Character = Cast<AMHWCharacter>(Pawn);
+	if (!Character)
+	{
+		return;
+	}
+
+	const bool bSprintPressed = InputActionValue.GetMagnitude() > 0.5f;
+	if (bSprintPressed)
+	{
+		Character->SetDesiredGait(MHWGaitTags::Sprinting);
+		return;
+	}
+
+	const UMHWInputComponent* MHWInputComp = GetMHWInputComponent();
+	const float MoveStrength = MHWInputComp ? MHWInputComp->RawMoveInput.Size2D() : 0.0f;
+	Character->SetDesiredGait(MoveStrength > 0.5f ? MHWGaitTags::Running : MHWGaitTags::Walking);
 }
 
 void UMHWHeroComponent::Input_LookMouse(const FInputActionValue& InputActionValue)
@@ -417,50 +389,7 @@ void UMHWHeroComponent::Input_LookMouse(const FInputActionValue& InputActionValu
 	}
 }
 
-void UMHWHeroComponent::Input_LookStick(const FInputActionValue& InputActionValue)
-{
-	APawn* Pawn = GetPawn<APawn>();
 
-	if (!Pawn)
-	{
-		return;
-	}
-	
-	const FVector2D Value = InputActionValue.Get<FVector2D>();
-
-	const UWorld* World = GetWorld();
-	check(World);
-
-	if (Value.X != 0.0f)
-	{
-		Pawn->AddControllerYawInput(Value.X * MHWHero::LookYawRate * World->GetDeltaSeconds());
-	}
-
-	if (Value.Y != 0.0f)
-	{
-		Pawn->AddControllerPitchInput(Value.Y * MHWHero::LookPitchRate * World->GetDeltaSeconds());
-	}
-}
-
-void UMHWHeroComponent::Input_Crouch(const FInputActionValue& InputActionValue)
-{
-	/*if (AMHWCharacter* Character = GetPawn<AMHWCharacter>())
-	{
-		Character->ToggleCrouch();
-	}*/
-}
-
-void UMHWHeroComponent::Input_AutoRun(const FInputActionValue& InputActionValue)
-{
-	/*if (APawn* Pawn = GetPawn<APawn>())
-	{
-		if (AMHWPlayerController* Controller = Cast<AMHWPlayerController>(Pawn->GetController()))
-		{
-			// Toggle auto running
-			Controller->SetIsAutoRunning(!Controller->GetIsAutoRunning());
-		}	
-	}*/
-}
 
 UMHWInputComponent* UMHWHeroComponent::GetMHWInputComponent()
 {
