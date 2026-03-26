@@ -37,6 +37,8 @@ namespace MHWStateTags
 	// --- 初始化阶段 ---
 	// --- state
 	UE_DEFINE_GAMEPLAY_TAG(ComboWindow, "State.ComboWindow");
+	UE_DEFINE_GAMEPLAY_TAG(ComboWindow_First, "State.ComboWindow.First");
+	UE_DEFINE_GAMEPLAY_TAG(ComboWindow_Second, "State.ComboWindow.Second");
 	UE_DEFINE_GAMEPLAY_TAG(IsMoving, "State.IsMoving");
 	
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Drawn, "State.Combat.Drawn");

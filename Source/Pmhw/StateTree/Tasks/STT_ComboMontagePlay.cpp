@@ -1,0 +1,392 @@
+#include "STT_ComboMontagePlay.h"
+
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Character/MHWCharacter.h"
+#include "Character/MHWComboPreInputComponent.h"
+#include "Interface/MHWCharacterInterface.h"
+#include "MotionWarpingComponent.h"
+#include "StateTreeExecutionContext.h"
+
+namespace ComboMontagePlayTask
+{
+	static UAbilitySystemComponent* GetASC(AActor* InActor)
+	{
+		return InActor ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InActor) : nullptr;
+	}
+
+	static void UnbindMontageDelegates(UAnimInstance* AnimInstance, UAnimMontage* Montage)
+	{
+		if (!AnimInstance || !Montage)
+		{
+			return;
+		}
+
+		FOnMontageBlendingOutStarted EmptyBlendOutDelegate;
+		AnimInstance->Montage_SetBlendingOutDelegate(EmptyBlendOutDelegate, Montage);
+
+		FOnMontageEnded EmptyEndDelegate;
+		AnimInstance->Montage_SetEndDelegate(EmptyEndDelegate, Montage);
+	}
+
+	static void RemoveConfiguredTags(
+		AActor* Actor,
+		const bool bRemoveTags,
+		const bool bRemoveTagAndChildren,
+		const FGameplayTagContainer& TagsToRemove)
+	{
+		if (!bRemoveTags || TagsToRemove.IsEmpty())
+		{
+			return;
+		}
+
+		UAbilitySystemComponent* ASC = GetASC(Actor);
+		if (!ASC)
+		{
+			return;
+		}
+
+		if (bRemoveTagAndChildren)
+		{
+			FGameplayTagContainer OwnedTags;
+			ASC->GetOwnedGameplayTags(OwnedTags);
+
+			FGameplayTagContainer ActualTagsToRemove;
+			for (const FGameplayTag& RootTag : TagsToRemove)
+			{
+				for (const FGameplayTag& OwnedTag : OwnedTags)
+				{
+					if (OwnedTag.MatchesTag(RootTag))
+					{
+						ActualTagsToRemove.AddTagFast(OwnedTag);
+					}
+				}
+			}
+
+			if (!ActualTagsToRemove.IsEmpty())
+			{
+				ASC->RemoveLooseGameplayTags(ActualTagsToRemove);
+			}
+			return;
+		}
+
+		ASC->RemoveLooseGameplayTags(TagsToRemove);
+	}
+
+	static bool ResolveMotionWarpingTarget(
+		AMHWCharacter* Character,
+		const bool bUseMotionWarping,
+		const FName ConfiguredMotionWarpingName,
+		const FTransform& ConfiguredTargetTransform,
+		FName& OutMotionWarpingName,
+		FTransform& OutTargetTransform)
+	{
+		if (!bUseMotionWarping || !Character)
+		{
+			return false;
+		}
+
+		if (!ConfiguredMotionWarpingName.IsNone())
+		{
+			OutMotionWarpingName = ConfiguredMotionWarpingName;
+			OutTargetTransform = ConfiguredTargetTransform;
+			return true;
+		}
+
+		return Character->ConsumePendingMotionWarpTarget(OutMotionWarpingName, OutTargetTransform);
+	}
+
+	static void CleanupCharacterState(
+		AMHWCharacter* Character,
+		const bool bClearMotionWarpingOnExit,
+		const FName MotionWarpingName,
+		const bool bClearPreInputOnExit,
+		const bool bDisablePreInputOnExit)
+	{
+		if (!Character)
+		{
+			return;
+		}
+
+		if (bClearMotionWarpingOnExit && !MotionWarpingName.IsNone())
+		{
+			if (UMotionWarpingComponent* MotionWarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+			{
+				MotionWarpingComp->RemoveWarpTarget(MotionWarpingName);
+			}
+		}
+
+		if (Character->Implements<UMHWCharacterInterface>())
+		{
+			if (UMHWComboPreInputComponent* ComboPreInputComp = IMHWCharacterInterface::Execute_GetComboPreInputComponent(Character))
+			{
+				if (bClearPreInputOnExit)
+				{
+					ComboPreInputComp->ClearBuffer();
+				}
+				if (bDisablePreInputOnExit)
+				{
+					ComboPreInputComp->bCanPreInput = false;
+				}
+			}
+		}
+	}
+
+	static void CleanupTaskState(
+		AMHWCharacter* Character,
+		UAnimMontage* ComboMontage,
+		const bool bStopMontage,
+		const bool bClearMotionWarpingOnExit,
+		const FName MotionWarpingName,
+		const bool bClearPreInputOnExit,
+		const bool bDisablePreInputOnExit,
+		FSTT_ComboMontagePlayInstanceData& InstanceData)
+	{
+		if (!Character)
+		{
+			InstanceData.CachedAnimInstance = nullptr;
+			InstanceData.PlayedMontageLength = 0.0f;
+			InstanceData.LastMontagePosition = 0.0f;
+			InstanceData.ActiveMotionWarpingName = NAME_None;
+			InstanceData.bMontageStarted = false;
+			InstanceData.bMontageEnded = false;
+			InstanceData.bMontageInterrupted = false;
+			InstanceData.bInterruptedCleanupDone = false;
+			InstanceData.bAppliedMotionWarping = false;
+			return;
+		}
+
+		UAnimInstance* AnimInstance = InstanceData.CachedAnimInstance.Get();
+		if (!AnimInstance)
+		{
+			if (USkeletalMeshComponent* MeshComponent = Character->GetMesh())
+			{
+				AnimInstance = MeshComponent->GetAnimInstance();
+			}
+		}
+
+		// Stop montage first, so AnimNotifyState can receive end callbacks while context is still intact.
+		if (bStopMontage && ComboMontage)
+		{
+			Character->StopAnimMontage(ComboMontage);
+		}
+
+		UnbindMontageDelegates(AnimInstance, ComboMontage);
+
+		CleanupCharacterState(
+			Character,
+			bClearMotionWarpingOnExit,
+			MotionWarpingName,
+			bClearPreInputOnExit,
+			bDisablePreInputOnExit);
+
+		InstanceData.CachedAnimInstance = nullptr;
+		InstanceData.PlayedMontageLength = 0.0f;
+		InstanceData.LastMontagePosition = 0.0f;
+		InstanceData.ActiveMotionWarpingName = NAME_None;
+		InstanceData.bMontageStarted = false;
+		InstanceData.bMontageEnded = false;
+		InstanceData.bMontageInterrupted = false;
+		InstanceData.bInterruptedCleanupDone = false;
+		InstanceData.bAppliedMotionWarping = false;
+	}
+}
+
+FSTT_ComboMontagePlay::FSTT_ComboMontagePlay()
+{
+	bRemoveTagOnEnter = true;
+
+	RemoveTagsOnEnter.Reset();
+
+	RemoveTagsOnEnter.AddTagFast(MHWStateTags::ComboWindow);
+}
+
+EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& /*Transition*/) const
+{
+	FSTT_ComboMontagePlayInstanceData& InstanceData = Context.GetInstanceData<FSTT_ComboMontagePlayInstanceData>(*this);
+	InstanceData.CachedAnimInstance = nullptr;
+	InstanceData.PlayedMontageLength = 0.0f;
+	InstanceData.LastMontagePosition = 0.0f;
+	InstanceData.ActiveMotionWarpingName = NAME_None;
+	InstanceData.bMontageStarted = false;
+	InstanceData.bMontageEnded = false;
+	InstanceData.bMontageInterrupted = false;
+	InstanceData.bInterruptedCleanupDone = false;
+	InstanceData.bAppliedMotionWarping = false;
+
+	AMHWCharacter* Character = InstanceData.MHWCharacter;
+	if (!Character || !ComboMontage)
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+
+	ComboMontagePlayTask::RemoveConfiguredTags(Character, bRemoveTagOnEnter, bRemoveTagAndChildrenOnEnter, RemoveTagsOnEnter);
+
+	FName MotionWarpingNameToApply = NAME_None;
+	FTransform MotionWarpingTargetTransform = FTransform::Identity;
+	if (ComboMontagePlayTask::ResolveMotionWarpingTarget(
+		Character,
+		InstanceData.bUseMotionWarping,
+		InstanceData.MotionWarpingName,
+		InstanceData.TargetTransform,
+		MotionWarpingNameToApply,
+		MotionWarpingTargetTransform))
+	{
+		if (UMotionWarpingComponent* MotionWarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+		{
+			MotionWarpingComp->AddOrUpdateWarpTargetFromTransform(MotionWarpingNameToApply, MotionWarpingTargetTransform);
+			InstanceData.ActiveMotionWarpingName = MotionWarpingNameToApply;
+			InstanceData.bAppliedMotionWarping = true;
+		}
+	}
+
+	USkeletalMeshComponent* MeshComponent = Character->GetMesh();
+	UAnimInstance* AnimInstance = MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
+	{
+		ComboMontagePlayTask::CleanupTaskState(
+			Character,
+			ComboMontage,
+			false,
+			InstanceData.bClearMotionWarpingOnExit,
+			InstanceData.ActiveMotionWarpingName,
+			false,
+			false,
+			InstanceData);
+		return EStateTreeRunStatus::Failed;
+	}
+
+	float MontageStartTime = 0.0f;
+	if (!InstanceData.StartSection.IsNone())
+	{
+		const int32 SectionIndex = ComboMontage->GetSectionIndex(InstanceData.StartSection);
+		if (SectionIndex != INDEX_NONE)
+		{
+			const float SectionStartTime = ComboMontage->GetAnimCompositeSection(SectionIndex).GetTime();
+			MontageStartTime = FMath::Max(0.0f, SectionStartTime);
+
+			// Avoid hard section jump: stop current montage first, then play from target section time.
+			AnimInstance->Montage_Stop(ComboMontage->GetDefaultBlendOutTime(), ComboMontage);
+		}
+	}
+
+	const float PlayedLength = AnimInstance->Montage_Play(
+		ComboMontage,
+		PlayRate,
+		EMontagePlayReturnType::Duration,
+		MontageStartTime,
+		bShouldStopAllMontages);
+	if (PlayedLength <= 0.0f)
+	{
+		ComboMontagePlayTask::CleanupTaskState(
+			Character,
+			ComboMontage,
+			false,
+			InstanceData.bClearMotionWarpingOnExit,
+			InstanceData.ActiveMotionWarpingName,
+			false,
+			false,
+			InstanceData);
+		return EStateTreeRunStatus::Failed;
+	}
+
+	InstanceData.CachedAnimInstance = AnimInstance;
+	InstanceData.PlayedMontageLength = PlayedLength;
+	InstanceData.LastMontagePosition = AnimInstance->Montage_GetPosition(ComboMontage);
+	InstanceData.bMontageStarted = true;
+	InstanceData.bMontageEnded = false;
+	InstanceData.bMontageInterrupted = false;
+	InstanceData.bInterruptedCleanupDone = false;
+
+	FOnMontageBlendingOutStarted BlendingOutDelegate;
+	BlendingOutDelegate.BindLambda(
+		[CharacterPtr = TWeakObjectPtr<AMHWCharacter>(Character),
+		 bClearMotionWarpingOnExitValue = InstanceData.bClearMotionWarpingOnExit,
+		 MotionWarpingNameValue = InstanceData.ActiveMotionWarpingName,
+		 bClearPreInputOnExitValue = bClearPreInputOnExit,
+		 bDisablePreInputOnExitValue = bDisablePreInputOnExit,
+		 bDidCleanup = false](UAnimMontage* Montage, bool bInterrupted) mutable
+	{
+		if (!bInterrupted || bDidCleanup)
+		{
+			return;
+		}
+
+		AMHWCharacter* CharacterInstance = CharacterPtr.Get();
+		if (!CharacterInstance)
+		{
+			return;
+		}
+
+		bDidCleanup = true;
+		ComboMontagePlayTask::CleanupCharacterState(
+			CharacterInstance,
+			bClearMotionWarpingOnExitValue,
+			MotionWarpingNameValue,
+			bClearPreInputOnExitValue,
+			bDisablePreInputOnExitValue);
+	});
+	AnimInstance->Montage_SetBlendingOutDelegate(BlendingOutDelegate, ComboMontage);
+
+	return EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FSTT_ComboMontagePlay::Tick(FStateTreeExecutionContext& Context, const float /*DeltaTime*/) const
+{
+	FSTT_ComboMontagePlayInstanceData& InstanceData = Context.GetInstanceData<FSTT_ComboMontagePlayInstanceData>(*this);
+
+	AMHWCharacter* Character = InstanceData.MHWCharacter;
+	if (!Character || !ComboMontage)
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+
+	UAnimInstance* AnimInstance = InstanceData.CachedAnimInstance.Get();
+	if (!AnimInstance)
+	{
+		USkeletalMeshComponent* MeshComponent = Character->GetMesh();
+		AnimInstance = MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
+		InstanceData.CachedAnimInstance = AnimInstance;
+	}
+	if (!AnimInstance)
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+
+	if (AnimInstance->Montage_IsPlaying(ComboMontage))
+	{
+		InstanceData.LastMontagePosition = AnimInstance->Montage_GetPosition(ComboMontage);
+		return EStateTreeRunStatus::Running;
+	}
+
+	if (!InstanceData.bMontageStarted)
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+
+	if (InstanceData.bMontageEnded)
+	{
+		return InstanceData.bMontageInterrupted ? EStateTreeRunStatus::Failed : EStateTreeRunStatus::Succeeded;
+	}
+
+	const float SafeLength = FMath::Max(InstanceData.PlayedMontageLength, KINDA_SMALL_NUMBER);
+	const float CompletionRatio = InstanceData.LastMontagePosition / SafeLength;
+	return CompletionRatio >= SuccessCompletionThreshold ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Failed;
+}
+
+void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& /*Transition*/) const
+{
+	FSTT_ComboMontagePlayInstanceData& InstanceData = Context.GetInstanceData<FSTT_ComboMontagePlayInstanceData>(*this);
+
+	ComboMontagePlayTask::CleanupTaskState(
+		InstanceData.MHWCharacter,
+		ComboMontage,
+		bStopMontageOnExit,
+		InstanceData.bClearMotionWarpingOnExit,
+		InstanceData.ActiveMotionWarpingName,
+		bClearPreInputOnExit,
+		bDisablePreInputOnExit,
+		InstanceData);
+}

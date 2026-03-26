@@ -38,6 +38,8 @@ namespace MHWStateTags
 {
 	// --- 初始化相关 ---
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboWindow);   
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboWindow_First);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboWindow_Second);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Drawn); 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Defense); 
 	

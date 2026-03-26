@@ -26,6 +26,10 @@ struct FSTT_ManageGameplayTagsInstanceData
 
 	// [内部状态]：记录我们在 EnterState 时，真正成功移除了哪些 Tag。
 	FGameplayTagContainer TagsWeRemoved;
+
+	// [内部状态]：记录本任务是否应用过 Tag 变更。
+	// 用于下一次 Enter 时兜底恢复上次异常中断残留。
+	bool bHasAppliedChanges = false;
 };
 
 // =========================================================================

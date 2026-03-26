@@ -223,6 +223,39 @@ bool AMHWCharacter::RemoveMovementSettingsForWeaponState(FGameplayTag WeaponStat
 	return MovementSettings->WeaponStates.Remove(WeaponState) > 0;
 }
 
+void AMHWCharacter::SetPendingMotionWarpTarget(const FName InWarpTargetName, const FTransform& InTargetTransform)
+{
+	if (InWarpTargetName.IsNone())
+	{
+		ClearPendingMotionWarpTarget();
+		return;
+	}
+
+	PendingMotionWarpTargetName = InWarpTargetName;
+	PendingMotionWarpTargetTransform = InTargetTransform;
+	bHasPendingMotionWarpTarget = true;
+}
+
+bool AMHWCharacter::ConsumePendingMotionWarpTarget(FName& OutWarpTargetName, FTransform& OutTargetTransform)
+{
+	if (!bHasPendingMotionWarpTarget || PendingMotionWarpTargetName.IsNone())
+	{
+		return false;
+	}
+
+	OutWarpTargetName = PendingMotionWarpTargetName;
+	OutTargetTransform = PendingMotionWarpTargetTransform;
+	ClearPendingMotionWarpTarget();
+	return true;
+}
+
+void AMHWCharacter::ClearPendingMotionWarpTarget()
+{
+	bHasPendingMotionWarpTarget = false;
+	PendingMotionWarpTargetName = NAME_None;
+	PendingMotionWarpTargetTransform = FTransform::Identity;
+}
+
 bool AMHWCharacter::CanSprint() const
 {
 	// 1. 如果玩家根本没推摇杆/按方向键，不能原地冲刺

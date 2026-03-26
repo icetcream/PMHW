@@ -1,5 +1,6 @@
 ﻿#include "STT_CalcDirectionByAcceleration.h"
 
+#include "DrawDebugHelpers.h"
 #include "StateTreeExecutionContext.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -38,7 +39,7 @@ EStateTreeRunStatus FSTT_CalcDirectionByAcceleration::EnterState(FStateTreeExecu
 			else if (InputYawDelta > ClampedForwardHalfAngle && InputYawDelta <= 180.0f - ClampedForwardHalfAngle)
 			{
 				InstanceData.OutDirectionSection = Direction_Right;
-				AnimOffsetYaw = 90.0f;
+				AnimOffsetYaw = bRightTurnUseNegativeWarpCompensation ? -90.0f : 90.0f;
 			}
 			else if (InputYawDelta < -ClampedForwardHalfAngle && InputYawDelta >= -180.0f + ClampedForwardHalfAngle)
 			{
@@ -62,7 +63,7 @@ EStateTreeRunStatus FSTT_CalcDirectionByAcceleration::EnterState(FStateTreeExecu
 			else if (InputYawDelta > 0.0f)
 			{
 				InstanceData.OutDirectionSection = Direction_Right;
-				AnimOffsetYaw = 90.0f;
+				AnimOffsetYaw = bRightTurnUseNegativeWarpCompensation ? -90.0f : 90.0f;
 			}
 			else
 			{
@@ -81,6 +82,20 @@ EStateTreeRunStatus FSTT_CalcDirectionByAcceleration::EnterState(FStateTreeExecu
 	// 包装成 Transform 输出
 	InstanceData.OutWarpTarget.SetLocation(Character->GetActorLocation());
 	InstanceData.OutWarpTarget.SetRotation(TargetWarpRot.Quaternion());
+
+	if (bDebugDrawArrows)
+	{
+		if (UWorld* World = Character->GetWorld())
+		{
+			const FVector BaseLocation = Character->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+			const FVector InputDir = InputVector.GetSafeNormal();
+			const FVector InputEnd = BaseLocation + (InputDir.IsNearlyZero() ? Character->GetActorForwardVector() : InputDir) * 100.0f;
+			const FVector WarpEnd = BaseLocation + TargetWarpRot.Vector() * 120.0f;
+
+			DrawDebugDirectionalArrow(World, BaseLocation, InputEnd, 18.0f, FColor::Cyan, false, 1.5f, 0, 2.0f);
+			DrawDebugDirectionalArrow(World, BaseLocation + FVector(0.0f, 0.0f, 8.0f), WarpEnd + FVector(0.0f, 0.0f, 8.0f), 18.0f, FColor::Yellow, false, 1.5f, 0, 2.0f);
+		}
+	}
 
 	return EStateTreeRunStatus::Running;
 }

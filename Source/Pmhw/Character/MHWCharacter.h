@@ -94,6 +94,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Settings")
 	bool RemoveMovementSettingsForWeaponState(FGameplayTag WeaponState);
+
+	// MotionWarping request cache shared across tasks:
+	// producer task writes target, consumer task reads once and applies.
+	void SetPendingMotionWarpTarget(FName InWarpTargetName, const FTransform& InTargetTransform);
+	bool ConsumePendingMotionWarpTarget(FName& OutWarpTargetName, FTransform& OutTargetTransform);
+	void ClearPendingMotionWarpTarget();
+	bool HasPendingMotionWarpTarget() const { return bHasPendingMotionWarpTarget; }
 	
 protected:
 	
@@ -241,6 +248,15 @@ private:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMHWMovementComponent> MHWMovementComponent;
+
+	UPROPERTY(Transient)
+	bool bHasPendingMotionWarpTarget = false;
+
+	UPROPERTY(Transient)
+	FName PendingMotionWarpTargetName = NAME_None;
+
+	UPROPERTY(Transient)
+	FTransform PendingMotionWarpTargetTransform = FTransform::Identity;
 
 };
 

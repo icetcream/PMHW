@@ -17,6 +17,7 @@ static UAbilitySystemComponent* GetASCFromActor(AActor* InActor)
 
 EStateTreeRunStatus FSTT_ManageGameplayTags::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
+	(void)Transition;
 	FSTT_ManageGameplayTagsInstanceData& InstanceData = Context.GetInstanceData<FSTT_ManageGameplayTagsInstanceData>(*this);
 	
 	UAbilitySystemComponent* ASC = GetASCFromActor(InstanceData.TargetActor);
@@ -25,69 +26,84 @@ EStateTreeRunStatus FSTT_ManageGameplayTags::EnterState(FStateTreeExecutionConte
 		return EStateTreeRunStatus::Failed;
 	}
 
+	// 兜底：如果上一次异常中断导致 Exit 没走到，这里先补做一次恢复，避免 BlockTag 残留。
+	if (bRestoreTagsOnExit && InstanceData.bHasAppliedChanges)
+	{
+		if (!InstanceData.TagsWeAdded.IsEmpty())
+		{
+			ASC->RemoveLooseGameplayTags(InstanceData.TagsWeAdded);
+		}
+		if (!InstanceData.TagsWeRemoved.IsEmpty())
+		{
+			ASC->AddLooseGameplayTags(InstanceData.TagsWeRemoved);
+		}
+	}
+
 	// 每次进入前，清空我们上次的记录
 	InstanceData.TagsWeAdded.Reset();
 	InstanceData.TagsWeRemoved.Reset();
+	InstanceData.bHasAppliedChanges = false;
 
 	// ==================== 1. 处理添加 Tags ====================
 	if (!TagsToAddOnEnter.IsEmpty())
 	{
-		// 记录一下：如果目标身上本来没有这个 Tag，我们才把它记到“是我们加的”小本本里
-		for (const FGameplayTag& Tag : TagsToAddOnEnter)
-		{
-			if (!ASC->HasMatchingGameplayTag(Tag)) // 注意：AddLooseGameplayTag 是精确添加，所以查的时候最好查精确
-			{
-				InstanceData.TagsWeAdded.AddTagFast(Tag);
-			}
-		}
-
-		// 批量添加 Loose Tags (非常适合外部系统如 StateTree 来修改状态)
+		// 对称恢复策略：我们在 Enter 批量加了哪些，Exit 就按同一批量减掉。
+		InstanceData.TagsWeAdded.AppendTags(TagsToAddOnEnter);
 		ASC->AddLooseGameplayTags(TagsToAddOnEnter);
 	}
 
 	// ==================== 2. 处理移除 Tags ====================
 	if (!TagsToRemoveOnEnter.IsEmpty())
 	{
+		FGameplayTagContainer OwnedTags;
+		ASC->GetOwnedGameplayTags(OwnedTags);
+
 		if (bRemoveExactAndChildren)
 		{
-			// 【高级玩法】：移除该 Tag 及其所有子 Tag！
-			// 例如配置了 State.Combat，连 State.Combat.Charging 也一起拔掉。
-			
 			UGameplayTagsManager& TagManager = UGameplayTagsManager::Get();
 			FGameplayTagContainer ActualTagsToRemove;
 
 			for (const FGameplayTag& TagToRemove : TagsToRemoveOnEnter)
 			{
-				// 获取这个 Tag 及其所有子代 Tag 的集合
-				FGameplayTagContainer TagAndChildren = TagManager.RequestGameplayTagChildren(TagToRemove);
+				FGameplayTagContainer TagAndChildren;
+				TagAndChildren.AddTagFast(TagToRemove); // 同时处理根标签本身
+				TagAndChildren.AppendTags(TagManager.RequestGameplayTagChildren(TagToRemove));
 				
-				for (const FGameplayTag& ChildTag : TagAndChildren)
+				for (const FGameplayTag& CandidateTag : TagAndChildren)
 				{
-					// 如果角色身上确实有这个 Tag，我们才记下来打算移除它
-					if (ASC->HasMatchingGameplayTag(ChildTag))
+					if (OwnedTags.HasTagExact(CandidateTag))
 					{
-						ActualTagsToRemove.AddTagFast(ChildTag);
+						ActualTagsToRemove.AddTagFast(CandidateTag);
 					}
 				}
 			}
 
-			// 记录并批量移除
-			InstanceData.TagsWeRemoved.AppendTags(ActualTagsToRemove);
-			ASC->RemoveLooseGameplayTags(ActualTagsToRemove);
+			if (!ActualTagsToRemove.IsEmpty())
+			{
+				InstanceData.TagsWeRemoved.AppendTags(ActualTagsToRemove);
+				ASC->RemoveLooseGameplayTags(ActualTagsToRemove);
+			}
 		}
 		else
 		{
-			// 普通的精确移除
+			FGameplayTagContainer ActualTagsToRemove;
 			for (const FGameplayTag& Tag : TagsToRemoveOnEnter)
 			{
-				if (ASC->HasMatchingGameplayTag(Tag))
+				if (OwnedTags.HasTagExact(Tag))
 				{
-					InstanceData.TagsWeRemoved.AddTagFast(Tag);
+					ActualTagsToRemove.AddTagFast(Tag);
 				}
 			}
-			ASC->RemoveLooseGameplayTags(TagsToRemoveOnEnter);
+
+			if (!ActualTagsToRemove.IsEmpty())
+			{
+				InstanceData.TagsWeRemoved.AppendTags(ActualTagsToRemove);
+				ASC->RemoveLooseGameplayTags(ActualTagsToRemove);
+			}
 		}
 	}
+
+	InstanceData.bHasAppliedChanges = !InstanceData.TagsWeAdded.IsEmpty() || !InstanceData.TagsWeRemoved.IsEmpty();
 
 	// 任务瞬间执行完毕，不阻塞状态机，返回 Running 表示它在后台默默维持着这些状态
 	return EStateTreeRunStatus::Running;
@@ -95,33 +111,43 @@ EStateTreeRunStatus FSTT_ManageGameplayTags::EnterState(FStateTreeExecutionConte
 
 void FSTT_ManageGameplayTags::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
-	// 如果不要求恢复，直接拍屁股走人
+	(void)Transition;
+	FSTT_ManageGameplayTagsInstanceData& InstanceData = Context.GetInstanceData<FSTT_ManageGameplayTagsInstanceData>(*this);
+
+	// 如果不要求恢复，直接清空运行时记录并返回。
 	if (!bRestoreTagsOnExit)
 	{
+		InstanceData.TagsWeAdded.Reset();
+		InstanceData.TagsWeRemoved.Reset();
+		InstanceData.bHasAppliedChanges = false;
 		return;
 	}
 
-	FSTT_ManageGameplayTagsInstanceData& InstanceData = Context.GetInstanceData<FSTT_ManageGameplayTagsInstanceData>(*this);
+	// 没应用过变更则无需恢复。
+	if (!InstanceData.bHasAppliedChanges)
+	{
+		InstanceData.TagsWeAdded.Reset();
+		InstanceData.TagsWeRemoved.Reset();
+		return;
+	}
+
 	UAbilitySystemComponent* ASC = GetASCFromActor(InstanceData.TargetActor);
 
 	if (ASC)
 	{
-		// ==================== 3. 恢复退出时的状态 ====================
-		
-		// 把我们进门时加的 Tag，全拔掉
 		if (!InstanceData.TagsWeAdded.IsEmpty())
 		{
 			ASC->RemoveLooseGameplayTags(InstanceData.TagsWeAdded);
 		}
 
-		// 把我们进门时拔掉的 Tag（包括那些被连坐的子 Tag），全加回来
 		if (!InstanceData.TagsWeRemoved.IsEmpty())
 		{
 			ASC->AddLooseGameplayTags(InstanceData.TagsWeRemoved);
 		}
-	}
 
-	// 清理小本本
-	InstanceData.TagsWeAdded.Reset();
-	InstanceData.TagsWeRemoved.Reset();
+		// 恢复成功后再清理；若 ASC 暂时失效，保留记录到下次 Enter 再兜底恢复。
+		InstanceData.TagsWeAdded.Reset();
+		InstanceData.TagsWeRemoved.Reset();
+		InstanceData.bHasAppliedChanges = false;
+	}
 }

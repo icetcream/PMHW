@@ -4,8 +4,8 @@
 // 必须包含 GAS 相关的头文件
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Character/MHWCharacter.h"
 #include "MHWGameplayTags.h"
-#include "MotionWarpingComponent.h"
 #include "StateTreeExecutionContext.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Interface/CombatAnimInterface.h"
@@ -23,9 +23,10 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 	
 	Character->StopAnimMontage();
 
-	if (UMotionWarpingComponent* WarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+	if (AMHWCharacter* MHWCharacter = Cast<AMHWCharacter>(Character))
 	{
-		WarpingComp->RemoveWarpTarget(GreatSwordChargeTask::ChargeSmashTargetName);
+		// Clear stale request so the next montage won't consume an old target by mistake.
+		MHWCharacter->ClearPendingMotionWarpTarget();
 	}
 
 	InstanceData.CurrentTurnYaw = 0.0f;
@@ -150,9 +151,10 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 			}
 		}
 
-		if (UMotionWarpingComponent* WarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+		if (AMHWCharacter* MHWCharacter = Cast<AMHWCharacter>(Character))
 		{
-			WarpingComp->RemoveWarpTarget(GreatSwordChargeTask::ChargeSmashTargetName);
+			// Always clear old request first to keep one-shot semantics.
+			MHWCharacter->ClearPendingMotionWarpTarget();
 
 			// a. 计算出我们期望下砸的最终朝向
 			FRotator CurrentActorRot = Character->GetActorRotation();
@@ -165,11 +167,11 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 			TargetTransform.SetLocation(Character->GetActorLocation());
 			TargetTransform.SetRotation(TargetRot.Quaternion());
 
-			// c. 【神之一手】将这个目标喂给 Motion Warping 组件！
+			// c. 将目标写入 Character 缓存，由下游 Montage 任务统一执行 MotionWarping。
 			// "ChargeSmashTarget" 是我们随便起的一个名字，记好它，等会要在 Montage 里填！
 			if (bUseMotiongWarping)
 			{
-				WarpingComp->AddOrUpdateWarpTargetFromTransform(GreatSwordChargeTask::ChargeSmashTargetName, TargetTransform);
+				MHWCharacter->SetPendingMotionWarpTarget(GreatSwordChargeTask::ChargeSmashTargetName, TargetTransform);
 			}
 		}
 	}

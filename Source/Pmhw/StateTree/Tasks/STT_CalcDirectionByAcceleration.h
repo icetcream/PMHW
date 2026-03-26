@@ -61,6 +61,14 @@ struct PMHW_API FSTT_CalcDirectionByAcceleration : public FStateTreeTaskCommonBa
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FName Direction_Right = FName("Right");
 
+	// 勾选后：当判定为“右转”时，右转补偿角使用 -90（适配曲线为 -90 -> 0 的资产）。
+	// 不勾选时：右转补偿角使用 +90（默认行为）。
+	UPROPERTY(EditAnywhere, Category = "Settings")
+	bool bRightTurnUseNegativeWarpCompensation = false;
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool bDebugDrawArrows = false;
+
 	// 核心逻辑只在进入时算一次
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 };
