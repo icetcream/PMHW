@@ -88,6 +88,21 @@ const UMHWHitStopData* UMHWEquipmentInstance::GetHitStopData() const
 	return nullptr;
 }
 
+const UMHWEquipmentDefinition* UMHWEquipmentInstance::GetEquipmentDefinition() const
+{
+	return EquipmentDef ? GetDefault<UMHWEquipmentDefinition>(EquipmentDef) : nullptr;
+}
+
+const FMHWMeleeTraceConfig* UMHWEquipmentInstance::GetDefaultMeleeTraceConfig() const
+{
+	if (const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition())
+	{
+		return &EquipmentDefinition->DefaultMeleeTraceConfig;
+	}
+
+	return nullptr;
+}
+
 
 
 void UMHWEquipmentInstance::SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn)

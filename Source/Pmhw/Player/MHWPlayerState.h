@@ -9,6 +9,7 @@
 
 class UMHWEquipmentManagerComponent;
 class UMHWAbilitySystemComponent;
+class UMHWCombatAttributeSet;
 /**
  * 
  */
@@ -21,6 +22,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|PlayerState")
 	UMHWAbilitySystemComponent* GetMHWAbilitySystemComponent() const { return AbilitySystemComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|PlayerState")
+	const UMHWCombatAttributeSet* GetCombatAttributeSet() const { return CombatAttributeSet; }
+
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 private:
@@ -28,4 +33,7 @@ private:
 	// The ability system component sub-object used by player characters.
 	UPROPERTY(VisibleAnywhere, Category = "MHW|PlayerState")
 	TObjectPtr<UMHWAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, Category = "MHW|PlayerState")
+	TObjectPtr<UMHWCombatAttributeSet> CombatAttributeSet;
 };

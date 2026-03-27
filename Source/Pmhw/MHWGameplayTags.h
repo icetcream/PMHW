@@ -81,6 +81,24 @@ namespace MHWMessageTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Animation_Complete);
 }
 
+namespace MHWDamageDataTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TrueRawAttack)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(MotionValue)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(MotionValueScale)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(SharpnessMultiplier)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AffinityChance)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(PositiveCriticalMultiplier)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(NegativeCriticalMultiplier)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(CriticalMultiplierOverride)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(BounceMultiplier)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(EnrageMultiplier)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AilmentMultiplier)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(DefenseRate)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitzoneValue)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AdditionalMultiplier)
+}
+
 namespace MHWRotationModeTags
 {
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(VelocityDirection)

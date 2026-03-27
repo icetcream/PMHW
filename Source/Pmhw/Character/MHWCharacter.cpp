@@ -10,6 +10,8 @@
 #include "MHWMovementComponent.h"
 #include "MotionWarpingComponent.h"
 #include "Animation/MHWAnimInstance.h"
+#include "Character/MHWAttackComponent.h"
+#include "Character/MHWCombatComponent.h"
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "Equipment/MHWEquipmentManagerComponent.h"
@@ -33,6 +35,8 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	MHWStateTreeComponent = CreateDefaultSubobject<UStateTreeComponent>("MHWStateTreeComponent");
 	MHWComboPreInputComponent = CreateDefaultSubobject<UMHWComboPreInputComponent>(TEXT("MHWComboPreInputComponent"));
 	MHWMeleeTraceComponent = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MHWMeleeTraceComponent"));
+	MHWAttackComponent = CreateDefaultSubobject<UMHWAttackComponent>(TEXT("MHWAttackComponent"));
+	MHWCombatComponent = CreateDefaultSubobject<UMHWCombatComponent>(TEXT("MHWCombatComponent"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -134,6 +138,83 @@ UMHWComboPreInputComponent* AMHWCharacter::GetComboPreInputComponent_Implementat
 UMeleeTraceComponent* AMHWCharacter::GetMeleeTraceComponent_Implementation()
 {
 	return MHWMeleeTraceComponent;
+}
+
+UMHWAttackComponent* AMHWCharacter::GetAttackComponent_Implementation()
+{
+	return MHWAttackComponent;
+}
+
+float AMHWCharacter::GetHealth() const
+{
+	if (const UMHWCombatComponent* CombatComponent = GetCombatComponent())
+	{
+		return CombatComponent->GetHealth();
+	}
+	return 0.0f;
+}
+
+float AMHWCharacter::GetMaxHealth() const
+{
+	if (const UMHWCombatComponent* CombatComponent = GetCombatComponent())
+	{
+		return CombatComponent->GetMaxHealth();
+	}
+	return 0.0f;
+}
+
+float AMHWCharacter::GetHealthPercent() const
+{
+	if (const UMHWCombatComponent* CombatComponent = GetCombatComponent())
+	{
+		return CombatComponent->GetHealthPercent();
+	}
+	return 0.0f;
+}
+
+float AMHWCharacter::GetStamina() const
+{
+	if (const UMHWCombatComponent* CombatComponent = GetCombatComponent())
+	{
+		return CombatComponent->GetStamina();
+	}
+	return 0.0f;
+}
+
+float AMHWCharacter::GetMaxStamina() const
+{
+	if (const UMHWCombatComponent* CombatComponent = GetCombatComponent())
+	{
+		return CombatComponent->GetMaxStamina();
+	}
+	return 0.0f;
+}
+
+float AMHWCharacter::GetStaminaPercent() const
+{
+	if (const UMHWCombatComponent* CombatComponent = GetCombatComponent())
+	{
+		return CombatComponent->GetStaminaPercent();
+	}
+	return 0.0f;
+}
+
+bool AMHWCharacter::IsAlive() const
+{
+	return MHWCombatComponent ? MHWCombatComponent->IsAlive() : false;
+}
+
+bool AMHWCharacter::ConsumeStamina(float Amount)
+{
+	return MHWCombatComponent ? MHWCombatComponent->ConsumeStamina(Amount) : false;
+}
+
+void AMHWCharacter::RestoreStamina(float Amount)
+{
+	if (MHWCombatComponent)
+	{
+		MHWCombatComponent->RestoreStamina(Amount);
+	}
 }
 
 void AMHWCharacter::SetDesiredGait(FGameplayTag NewDesiredGait)
@@ -651,6 +732,3 @@ const FMHWMovementGaitSettings* AMHWCharacter::GetCurrentGaitSettings() const
 	
 	return GaitSettings;
 }
-
-
-

@@ -15,6 +15,8 @@
 struct FMHWMovementGaitSettings;
 class UMHWMovementSettings;
 class UMHWAnimInstance;
+class UMHWAttackComponent;
+class UMHWCombatComponent;
 class UMotionWarpingComponent;
 class UMeleeTraceComponent;
 class UMHWMovementComponent;
@@ -46,6 +48,40 @@ public:
 	virtual UStateTreeComponent* GetStateTreeComponent_Implementation() override;
 	virtual UMHWComboPreInputComponent* GetComboPreInputComponent_Implementation() override;
 	virtual UMeleeTraceComponent* GetMeleeTraceComponent_Implementation() override;
+	virtual UMHWAttackComponent* GetAttackComponent_Implementation() override;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	float GetHealth() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	float GetMaxHealth() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	float GetHealthPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	float GetStamina() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	float GetMaxStamina() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	float GetStaminaPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	bool IsAlive() const;
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attributes")
+	bool ConsumeStamina(float Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attributes")
+	void RestoreStamina(float Amount);
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
+	UMHWCombatComponent* GetCombatComponent() const { return MHWCombatComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	UMHWAttackComponent* GetAttackComponentInstance() const { return MHWAttackComponent; }
 	
 public:
 	// 1. 提供给外部或蓝图调用的 Setter (比如你的输入组件按下 Shift 时调用)
@@ -103,7 +139,6 @@ public:
 	bool HasPendingMotionWarpTarget() const { return bHasPendingMotionWarpTarget; }
 	
 protected:
-	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|Settings")
 	TObjectPtr<UMHWMovementSettings> MovementSettings;
 
@@ -239,6 +274,12 @@ private:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMeleeTraceComponent> MHWMeleeTraceComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMHWAttackComponent> MHWAttackComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMHWCombatComponent> MHWCombatComponent;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;

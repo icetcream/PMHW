@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystem/MHWDamageTypes.h"
+#include "Character/MHWMeleeHitVFXTypes.h"
 #include "Components/ActorComponent.h"
 #include "MeleeTraceComponent.generated.h"
 class UMHWHitStopData;
@@ -26,10 +28,22 @@ public:
 	TSubclassOf<UMHWEquipmentInstance> WeaponInstanceClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox Trace")
-	TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Pawn;
+	TEnumAsByte<ECollisionChannel> TraceChannel = ECC_GameTraceChannel1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox Trace")
 	bool bShowDebug = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage", meta = (ClampMin = "0.0"))
+	float BaseDamage = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+	bool bApplyDamageOnHit = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
+	bool bUsePhysicalDamageSpec = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage", meta = (EditCondition = "bUsePhysicalDamageSpec"))
+	FMHWPhysicalDamageSpec PhysicalDamageSpec;
 
 	// 打中怪物时触发的事件，蓝图可以绑定它来播放特效或扣血
 	UPROPERTY(BlueprintAssignable, Category = "Hitbox Trace")
@@ -46,6 +60,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace")
 	void StopTrace();
+
+	bool ResolveTraceConfig(const FName& OverrideBaseSocket, const TArray<FName>& OverrideTraceSockets, FName& OutBaseSocket, TArray<FName>& OutTraceSockets);
+
+	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace|VFX")
+	void SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec);
+
+	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace|VFX")
+	void ClearHitVFXSpec();
 
 private:
 
@@ -80,6 +102,7 @@ private:
 	
 	// 触发卡肉
 	void ApplyHitStop(AActor* HitActor);
+	void SpawnHitVFX(const FHitResult& HitResult) const;
 	// 强制结束卡肉并清理状态
 	void ResetHitStop();
 
@@ -97,4 +120,7 @@ private:
 
 	// 记录当前被卡肉减速影响的所有 Actor（攻击者自己 + 打中的怪物）
 	TArray<TWeakObjectPtr<AActor>> HitstopAffectedActors;
+
+	UPROPERTY(Transient)
+	FMHWMeleeHitVFXSpec CurrentHitVFXSpec;
 };

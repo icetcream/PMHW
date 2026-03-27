@@ -2,11 +2,15 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "DrawDebugHelpers.h"
+#include "AbilitySystem/MHWCombatBlueprintLibrary.h"
 #include "Data/MHWHitStopData.h"
 #include "Engine/World.h"
+#include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
 #include "Equipment/MHWEquipmentManagerComponent.h"
 #include "Interface/MHWCharacterInterface.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 
 
 UMeleeTraceComponent::UMeleeTraceComponent()
@@ -75,6 +79,35 @@ void UMeleeTraceComponent::ApplyHitStop(AActor* HitActor)
 	SetComponentTickEnabled(true); 
 }
 
+void UMeleeTraceComponent::SpawnHitVFX(const FHitResult& HitResult) const
+{
+	if (!CurrentHitVFXSpec.NiagaraSystem)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const FRotator BaseRotation = CurrentHitVFXSpec.bOrientToImpactNormal
+		? HitResult.ImpactNormal.Rotation()
+		: FRotator::ZeroRotator;
+	const FRotator SpawnRotation = BaseRotation + CurrentHitVFXSpec.RotationOffset;
+	const FVector SpawnLocation = HitResult.ImpactPoint + SpawnRotation.RotateVector(CurrentHitVFXSpec.LocationOffset);
+
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		World,
+		CurrentHitVFXSpec.NiagaraSystem,
+		SpawnLocation,
+		SpawnRotation,
+		CurrentHitVFXSpec.Scale,
+		true,
+		true);
+}
+
 void UMeleeTraceComponent::ResetHitStop()
 {
 	bIsHitstopping = false;
@@ -131,6 +164,32 @@ void UMeleeTraceComponent::StartTrace(FName InBaseSocket, const TArray<FName>& I
 	SetComponentTickEnabled(true); 
 }
 
+bool UMeleeTraceComponent::ResolveTraceConfig(const FName& OverrideBaseSocket, const TArray<FName>& OverrideTraceSockets, FName& OutBaseSocket, TArray<FName>& OutTraceSockets)
+{
+	GetWeaponMesh();
+
+	OutBaseSocket = OverrideBaseSocket;
+	OutTraceSockets = OverrideTraceSockets;
+
+	if (const UMHWEquipmentInstance* EquipmentInstance = CachedEquipmentInstance)
+	{
+		if (const FMHWMeleeTraceConfig* DefaultTraceConfig = EquipmentInstance->GetDefaultMeleeTraceConfig())
+		{
+			if (OutBaseSocket.IsNone())
+			{
+				OutBaseSocket = DefaultTraceConfig->BaseSocket;
+			}
+
+			if (OutTraceSockets.IsEmpty())
+			{
+				OutTraceSockets = DefaultTraceConfig->TraceSockets;
+			}
+		}
+	}
+
+	return !OutBaseSocket.IsNone() && !OutTraceSockets.IsEmpty();
+}
+
 void UMeleeTraceComponent::StopTrace()
 {
 	bIsTracing = false;
@@ -138,6 +197,16 @@ void UMeleeTraceComponent::StopTrace()
 	TraceSocketsLocalOffsets.Empty();
 	ActiveTraceSockets.Empty();
 	SetComponentTickEnabled(false); 
+}
+
+void UMeleeTraceComponent::SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec)
+{
+	CurrentHitVFXSpec = InHitVFXSpec;
+}
+
+void UMeleeTraceComponent::ClearHitVFXSpec()
+{
+	CurrentHitVFXSpec = FMHWMeleeHitVFXSpec();
 }
 
 void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -241,6 +310,21 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 					{
 						HitActors.Add(HitActor);
 						OnMeleeHit.Broadcast(Hit);
+						SpawnHitVFX(Hit);
+						const bool bHasDamagePayload = bUsePhysicalDamageSpec
+							? (PhysicalDamageSpec.TrueRawAttack > 0.0f)
+							: (BaseDamage > 0.0f);
+						if (bApplyDamageOnHit && bHasDamagePayload)
+						{
+							if (bUsePhysicalDamageSpec)
+							{
+								UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(HitActor, GetOwner(), PhysicalDamageSpec);
+							}
+							else
+							{
+								UMHWCombatBlueprintLibrary::ApplyRawDamageToActor(HitActor, BaseDamage);
+							}
+						}
 						ApplyHitStop(HitActor);
 					}
 				}

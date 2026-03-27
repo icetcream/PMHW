@@ -12,6 +12,7 @@ class AActor;
 class APawn;
 struct FFrame;
 struct FMHWEquipmentActorToSpawn;
+struct FMHWMeleeTraceConfig;
 
 
 
@@ -56,6 +57,11 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "Combat Feel")
 	const UMHWHitStopData* GetHitStopData() const;
+
+	UFUNCTION(BlueprintPure, Category = "Equipment")
+	const UMHWEquipmentDefinition* GetEquipmentDefinition() const;
+
+	const FMHWMeleeTraceConfig* GetDefaultMeleeTraceConfig() const;
 	
 
 	virtual void SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn);

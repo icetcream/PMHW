@@ -85,6 +85,23 @@ namespace MHWMessageTags
 {
 	UE_DEFINE_GAMEPLAY_TAG(Animation_Complete, "Msg.Animation.Complete");
 }
+namespace MHWDamageDataTags
+{
+	UE_DEFINE_GAMEPLAY_TAG(TrueRawAttack, "Data.Damage.TrueRawAttack");
+	UE_DEFINE_GAMEPLAY_TAG(MotionValue, "Data.Damage.MotionValue");
+	UE_DEFINE_GAMEPLAY_TAG(MotionValueScale, "Data.Damage.MotionValueScale");
+	UE_DEFINE_GAMEPLAY_TAG(SharpnessMultiplier, "Data.Damage.SharpnessMultiplier");
+	UE_DEFINE_GAMEPLAY_TAG(AffinityChance, "Data.Damage.AffinityChance");
+	UE_DEFINE_GAMEPLAY_TAG(PositiveCriticalMultiplier, "Data.Damage.PositiveCriticalMultiplier");
+	UE_DEFINE_GAMEPLAY_TAG(NegativeCriticalMultiplier, "Data.Damage.NegativeCriticalMultiplier");
+	UE_DEFINE_GAMEPLAY_TAG(CriticalMultiplierOverride, "Data.Damage.CriticalMultiplierOverride");
+	UE_DEFINE_GAMEPLAY_TAG(BounceMultiplier, "Data.Damage.BounceMultiplier");
+	UE_DEFINE_GAMEPLAY_TAG(EnrageMultiplier, "Data.Damage.EnrageMultiplier");
+	UE_DEFINE_GAMEPLAY_TAG(AilmentMultiplier, "Data.Damage.AilmentMultiplier");
+	UE_DEFINE_GAMEPLAY_TAG(DefenseRate, "Data.Damage.DefenseRate");
+	UE_DEFINE_GAMEPLAY_TAG(HitzoneValue, "Data.Damage.HitzoneValue");
+	UE_DEFINE_GAMEPLAY_TAG(AdditionalMultiplier, "Data.Damage.AdditionalMultiplier");
+}
 namespace MHWRotationModeTags
 {
 	UE_DEFINE_GAMEPLAY_TAG(VelocityDirection, FName{TEXTVIEW("Als.RotationMode.VelocityDirection")})

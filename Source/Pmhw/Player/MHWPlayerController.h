@@ -15,8 +15,12 @@ class PMHW_API AMHWPlayerController : public APlayerController, public IAbilityS
 {
 	GENERATED_BODY()
 public:
+	virtual void BeginPlay() override;
+	virtual void OnPossess(APawn* InPawn) override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 private:
+	void TryInitOverlay(APawn* InPawn);
+
 	mutable TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 };

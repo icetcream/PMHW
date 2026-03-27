@@ -13,6 +13,18 @@ class AActor;
 class UMHWAbilitySet;
 class UMHWEquipmentInstance;
 
+USTRUCT(BlueprintType)
+struct PMHW_API FMHWMeleeTraceConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MHW|Combat|Trace")
+	FName BaseSocket = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MHW|Combat|Trace")
+	TArray<FName> TraceSockets;
+};
+
 USTRUCT()
 struct FMHWEquipmentActorToSpawn
 {
@@ -63,6 +75,9 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat Feel")
 	TObjectPtr<const UMHWHitStopData> HitStopData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
+	FMHWMeleeTraceConfig DefaultMeleeTraceConfig;
 
 	// Weapon state to set on the character when this equipment is equipped.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")

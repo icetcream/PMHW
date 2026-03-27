@@ -1,0 +1,117 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "AbilitySystem/MHWDamageTypes.h"
+#include "MHWCombatComponent.generated.h"
+
+class UAbilitySystemComponent;
+class UMHWCombatAttributeSet;
+struct FOnAttributeChangeData;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FMHWAttributeChangedSignature, float, NewValue, float, MaxValue, float, DeltaValue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMHWDamageSignature, float, DamageAmount, float, NewHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMHWDeathSignature);
+
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class PMHW_API UMHWCombatComponent : public UActorComponent
+{
+	GENERATED_BODY()
+
+public:
+	UMHWCombatComponent();
+
+	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	UAbilitySystemComponent* GetAbilitySystemComponent() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	const UMHWCombatAttributeSet* GetCombatAttributeSet() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	float GetHealth() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	float GetMaxHealth() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	float GetHealthPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	float GetStamina() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	float GetMaxStamina() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	float GetStaminaPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
+	bool IsAlive() const;
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
+	bool ConsumeStamina(float Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
+	void RestoreStamina(float Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
+	void RestoreHealth(float Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
+	bool ApplyRawDamage(float DamageAmount);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
+	bool ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
+	void ResetVitalsToMax();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Stamina")
+	bool bEnableStaminaAutoRegen = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Stamina", meta = (ClampMin = "0.0"))
+	float StaminaRegenRate = 20.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Stamina", meta = (ClampMin = "0.0"))
+	float StaminaRegenDelay = 1.25f;
+
+	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
+	FMHWAttributeChangedSignature OnHealthChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
+	FMHWAttributeChangedSignature OnStaminaChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
+	FMHWDamageSignature OnDamaged;
+
+	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
+	FMHWDeathSignature OnDeath;
+
+private:
+	bool TryInitializeFromOwner();
+	void HandleAutomaticStaminaRegen(float DeltaSeconds);
+	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	void HandleStaminaAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	void BroadcastInitialAttributeState();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAbilitySystemComponent> CachedAbilitySystemComponent;
+
+	UPROPERTY(Transient)
+	bool bAttributeDelegatesBound = false;
+
+	UPROPERTY(Transient)
+	float LastHealthValue = 0.0f;
+
+	UPROPERTY(Transient)
+	float LastStaminaValue = 0.0f;
+
+	UPROPERTY(Transient)
+	bool bDeathEventBroadcasted = false;
+
+	UPROPERTY(Transient)
+	float LastStaminaConsumeTime = -1.0f;
+};

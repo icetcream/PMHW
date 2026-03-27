@@ -8,6 +8,7 @@
 #include "MHWCharacterInterface.generated.h"
 
 class UMeleeTraceComponent;
+class UMHWAttackComponent;
 class UStateTreeComponent;
 class UMHWEquipmentManagerComponent;
 // This class does not need to be modified.
@@ -36,5 +37,8 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MHW|Interface")
 	UMeleeTraceComponent* GetMeleeTraceComponent();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "MHW|Interface")
+	UMHWAttackComponent* GetAttackComponent();
 
 };
