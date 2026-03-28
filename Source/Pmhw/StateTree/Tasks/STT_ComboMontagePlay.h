@@ -43,6 +43,7 @@ struct FSTT_ComboMontagePlayInstanceData
 	bool bMontageInterrupted = false;
 	bool bInterruptedCleanupDone = false;
 	bool bAppliedMotionWarping = false;
+	bool bAppliedAttackSpecTagOverride = false;
 };
 
 USTRUCT(meta = (DisplayName = "Combo Montage Play"))
@@ -63,8 +64,23 @@ struct PMHW_API FSTT_ComboMontagePlay : public FStateTreeTaskCommonBase
 	UPROPERTY(EditAnywhere, Category = "Montage")
 	bool bShouldStopAllMontages = true;
 
-	UPROPERTY(EditAnywhere, Category = "Cost", meta = (ToolTip = "如果填写，则在播放 Montage 前按该标签从当前武器的攻击数据表中读取耐力消耗，并调用角色的 ConsumeStamina。", Categories = "Data.AttackSpec"))
+	UPROPERTY(EditAnywhere, Category = "Cost", meta = (ToolTip = "If set, stamina cost is resolved from the current weapon attack data row before the montage starts.", Categories = "Data.AttackSpec"))
 	FGameplayTag AttackSpecTag;
+
+	UPROPERTY(EditAnywhere, Category = "Cost")
+	bool bUsePendingChargeLevel = false;
+
+	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "!bUsePendingChargeLevel", EditConditionHides))
+	bool bClearPendingChargeLevelOnEnter = false;
+
+	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "bUsePendingChargeLevel", EditConditionHides, Categories = "Data.AttackSpec"))
+	FGameplayTag ChargeLevel2AttackSpecTag;
+
+	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "bUsePendingChargeLevel", EditConditionHides, Categories = "Data.AttackSpec"))
+	FGameplayTag ChargeLevel3AttackSpecTag;
+
+	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "bUsePendingChargeLevel", EditConditionHides, Categories = "Data.AttackSpec"))
+	FGameplayTag OverchargedAttackSpecTag;
 
 	UPROPERTY(EditAnywhere, Category = "Montage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float SuccessCompletionThreshold = 0.95f;

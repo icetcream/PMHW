@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Character/MHWAttackComponent.h"
 #include "Character/MHWCharacter.h"
 #include "Character/MHWComboPreInputComponent.h"
 #include "Character/MeleeTraceComponent.h"
@@ -17,6 +18,16 @@ namespace ComboMontagePlayTask
 	static UAbilitySystemComponent* GetASC(AActor* InActor)
 	{
 		return InActor ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InActor) : nullptr;
+	}
+
+	static UMHWAttackComponent* GetAttackComponent(AActor* InActor)
+	{
+		if (!InActor || !InActor->Implements<UMHWCharacterInterface>())
+		{
+			return nullptr;
+		}
+
+		return IMHWCharacterInterface::Execute_GetAttackComponent(InActor);
 	}
 
 	static void UnbindMontageDelegates(UAnimInstance* AnimInstance, UAnimMontage* Montage)
@@ -157,6 +168,7 @@ namespace ComboMontagePlayTask
 			InstanceData.bMontageInterrupted = false;
 			InstanceData.bInterruptedCleanupDone = false;
 			InstanceData.bAppliedMotionWarping = false;
+			InstanceData.bAppliedAttackSpecTagOverride = false;
 			return;
 		}
 
@@ -193,6 +205,7 @@ namespace ComboMontagePlayTask
 		InstanceData.bMontageInterrupted = false;
 		InstanceData.bInterruptedCleanupDone = false;
 		InstanceData.bAppliedMotionWarping = false;
+		InstanceData.bAppliedAttackSpecTagOverride = false;
 	}
 
 	static bool TryConsumeConfiguredStamina(AMHWCharacter* Character, const FGameplayTag& AttackSpecTag)
@@ -243,6 +256,75 @@ namespace ComboMontagePlayTask
 
 		return true;
 	}
+
+	static FGameplayTag ResolveAttackSpecTagForChargeLevel(
+		const EMHWChargeLevel ChargeLevel,
+		const FGameplayTag& DefaultAttackSpecTag,
+		const FGameplayTag& ChargeLevel2AttackSpecTag,
+		const FGameplayTag& ChargeLevel3AttackSpecTag,
+		const FGameplayTag& OverchargedAttackSpecTag)
+	{
+		switch (ChargeLevel)
+		{
+		case EMHWChargeLevel::Level1:
+			return DefaultAttackSpecTag;
+		case EMHWChargeLevel::Level2:
+			return ChargeLevel2AttackSpecTag.IsValid() ? ChargeLevel2AttackSpecTag : DefaultAttackSpecTag;
+		case EMHWChargeLevel::Level3:
+			if (ChargeLevel3AttackSpecTag.IsValid())
+			{
+				return ChargeLevel3AttackSpecTag;
+			}
+			return ChargeLevel2AttackSpecTag.IsValid() ? ChargeLevel2AttackSpecTag : DefaultAttackSpecTag;
+		case EMHWChargeLevel::Overcharged:
+			if (OverchargedAttackSpecTag.IsValid())
+			{
+				return OverchargedAttackSpecTag;
+			}
+			return ChargeLevel2AttackSpecTag.IsValid() ? ChargeLevel2AttackSpecTag : DefaultAttackSpecTag;
+		default:
+			return DefaultAttackSpecTag;
+		}
+	}
+
+	static FGameplayTag ResolveEffectiveAttackSpecTagForTask(
+		AMHWCharacter* Character,
+		const FGameplayTag& DefaultAttackSpecTag,
+		const bool bUsePendingChargeLevel,
+		const bool bClearPendingChargeLevelOnEnter,
+		const FGameplayTag& ChargeLevel2AttackSpecTag,
+		const FGameplayTag& ChargeLevel3AttackSpecTag,
+		const FGameplayTag& OverchargedAttackSpecTag)
+	{
+		UMHWAttackComponent* AttackComponent = GetAttackComponent(Character);
+		if (!AttackComponent)
+		{
+			return DefaultAttackSpecTag;
+		}
+
+		if (bUsePendingChargeLevel)
+		{
+			EMHWChargeLevel PendingChargeLevel;
+			if (AttackComponent->PeekPendingChargeLevel(PendingChargeLevel))
+			{
+				return ResolveAttackSpecTagForChargeLevel(
+					PendingChargeLevel,
+					DefaultAttackSpecTag,
+					ChargeLevel2AttackSpecTag,
+					ChargeLevel3AttackSpecTag,
+					OverchargedAttackSpecTag);
+			}
+
+			return DefaultAttackSpecTag;
+		}
+
+		if (bClearPendingChargeLevelOnEnter)
+		{
+			AttackComponent->ClearPendingChargeLevel();
+		}
+
+		return DefaultAttackSpecTag;
+	}
 }
 
 FSTT_ComboMontagePlay::FSTT_ComboMontagePlay()
@@ -266,6 +348,7 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 	InstanceData.bMontageInterrupted = false;
 	InstanceData.bInterruptedCleanupDone = false;
 	InstanceData.bAppliedMotionWarping = false;
+	InstanceData.bAppliedAttackSpecTagOverride = false;
 
 	AMHWCharacter* Character = InstanceData.MHWCharacter;
 	if (!Character || !ComboMontage)
@@ -273,7 +356,21 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 		return EStateTreeRunStatus::Failed;
 	}
 
-	if (!ComboMontagePlayTask::TryConsumeConfiguredStamina(Character, AttackSpecTag))
+	if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(Character))
+	{
+		AttackComponent->ClearActiveAttackSpecTagOverride();
+	}
+
+	const FGameplayTag EffectiveAttackSpecTag = ComboMontagePlayTask::ResolveEffectiveAttackSpecTagForTask(
+		Character,
+		AttackSpecTag,
+		bUsePendingChargeLevel,
+		bClearPendingChargeLevelOnEnter,
+		ChargeLevel2AttackSpecTag,
+		ChargeLevel3AttackSpecTag,
+		OverchargedAttackSpecTag);
+
+	if (!ComboMontagePlayTask::TryConsumeConfiguredStamina(Character, EffectiveAttackSpecTag))
 	{
 		return EStateTreeRunStatus::Failed;
 	}
@@ -355,6 +452,33 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 	InstanceData.bMontageEnded = false;
 	InstanceData.bMontageInterrupted = false;
 	InstanceData.bInterruptedCleanupDone = false;
+
+	if (bUsePendingChargeLevel)
+	{
+		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(Character))
+		{
+			EMHWChargeLevel ConsumedChargeLevel;
+			if (AttackComponent->ConsumePendingChargeLevel(ConsumedChargeLevel))
+			{
+				const FGameplayTag ResolvedAttackSpecTag = ComboMontagePlayTask::ResolveAttackSpecTagForChargeLevel(
+					ConsumedChargeLevel,
+					AttackSpecTag,
+					ChargeLevel2AttackSpecTag,
+					ChargeLevel3AttackSpecTag,
+					OverchargedAttackSpecTag);
+
+				if (ResolvedAttackSpecTag.IsValid() && ResolvedAttackSpecTag != AttackSpecTag)
+				{
+					AttackComponent->SetActiveAttackSpecTagOverride(ResolvedAttackSpecTag);
+					InstanceData.bAppliedAttackSpecTagOverride = true;
+				}
+				else
+				{
+					AttackComponent->ClearActiveAttackSpecTagOverride();
+				}
+			}
+		}
+	}
 
 	FOnMontageBlendingOutStarted BlendingOutDelegate;
 	BlendingOutDelegate.BindLambda(
@@ -445,4 +569,12 @@ void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const
 		bClearPreInputOnExit,
 		bDisablePreInputOnExit,
 		InstanceData);
+
+	if (InstanceData.bAppliedAttackSpecTagOverride)
+	{
+		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(InstanceData.MHWCharacter))
+		{
+			AttackComponent->ClearActiveAttackSpecTagOverride();
+		}
+	}
 }

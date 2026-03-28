@@ -54,6 +54,7 @@ void UMHWCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModC
 			EMHWCriticalHitType CriticalHitType = EMHWCriticalHitType::None;
 			bool bHasDamageNumberWorldLocation = false;
 			FVector DamageNumberWorldLocation = FVector::ZeroVector;
+			FString AttackDisplayName;
 			const FGameplayEffectContextHandle& EffectContext = Data.EffectSpec.GetEffectContext();
 			if (UObject* SourceObject = EffectContext.GetSourceObject())
 			{
@@ -70,6 +71,10 @@ void UMHWCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModC
 					if (bHasDamageNumberWorldLocation)
 					{
 						DamageNumberWorldLocation = MHWEffectContext->GetDamageNumberWorldLocation();
+					}
+					if (MHWEffectContext->HasAttackDisplayName())
+					{
+						AttackDisplayName = MHWEffectContext->GetAttackDisplayName();
 					}
 				}
 			}
@@ -88,7 +93,7 @@ void UMHWCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModC
 			{
 				if (UMHWCombatComponent* CombatComponent = OwningActor->FindComponentByClass<UMHWCombatComponent>())
 				{
-					CombatComponent->NotifyDamageReceived(LocalIncomingDamage, NewHealth, SourceActor, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+					CombatComponent->NotifyDamageReceived(LocalIncomingDamage, NewHealth, SourceActor, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation, AttackDisplayName);
 				}
 			}
 		}

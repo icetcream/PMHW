@@ -15,5 +15,5 @@ public:
 	static bool ApplyRawDamageToActor(AActor* TargetActor, float DamageAmount);
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
-	static bool ApplyPhysicalDamageToActor(AActor* TargetActor, AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation = false, FVector DamageNumberWorldLocation = FVector::ZeroVector);
+	static bool ApplyPhysicalDamageToActor(AActor* TargetActor, AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation = false, FVector DamageNumberWorldLocation = FVector::ZeroVector, FString AttackDisplayName = TEXT(""));
 };

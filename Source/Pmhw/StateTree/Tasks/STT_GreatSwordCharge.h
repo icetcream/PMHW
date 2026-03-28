@@ -45,6 +45,15 @@ struct PMHW_API FSTT_GreatSwordCharge : public FStateTreeTaskCommonBase
 	
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	float MaxChargeDuration = 2.5f;
+
+	UPROPERTY(EditAnywhere, Category = "Charge Result", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float ChargeLevel2Threshold = 0.32f;
+
+	UPROPERTY(EditAnywhere, Category = "Charge Result", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float ChargeLevel3Threshold = 0.6f;
+
+	UPROPERTY(EditAnywhere, Category = "Charge Result", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float OverchargeThreshold = 0.8f;
 	
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	bool bUseMotiongWarping = true;

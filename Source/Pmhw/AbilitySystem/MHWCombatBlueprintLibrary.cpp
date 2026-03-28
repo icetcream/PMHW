@@ -13,10 +13,10 @@ bool UMHWCombatBlueprintLibrary::ApplyRawDamageToActor(AActor* TargetActor, floa
 {
 	FMHWPhysicalDamageSpec DamageSpec;
 	DamageSpec.TrueRawAttack = DamageAmount;
-	return ApplyPhysicalDamageToActor(TargetActor, nullptr, DamageSpec, false, FVector::ZeroVector);
+	return ApplyPhysicalDamageToActor(TargetActor, nullptr, DamageSpec, false, FVector::ZeroVector, FString());
 }
 
-bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor, AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation)
+bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor, AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation, FString AttackDisplayName)
 {
 	if (!IsValid(TargetActor) || DamageSpec.TrueRawAttack <= 0.0f)
 	{
@@ -25,7 +25,7 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 
 	if (UMHWCombatComponent* CombatComponent = TargetActor->FindComponentByClass<UMHWCombatComponent>())
 	{
-		return CombatComponent->ApplyPhysicalDamage(SourceActor, DamageSpec, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+		return CombatComponent->ApplyPhysicalDamage(SourceActor, DamageSpec, bHasDamageNumberWorldLocation, DamageNumberWorldLocation, AttackDisplayName);
 	}
 
 	UAbilitySystemComponent* TargetASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(TargetActor);
@@ -52,6 +52,17 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
 			{
 				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
+			}
+		}
+	}
+
+	if (!AttackDisplayName.IsEmpty())
+	{
+		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
+		{
+			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
+			{
+				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetAttackDisplayName(AttackDisplayName);
 			}
 		}
 	}

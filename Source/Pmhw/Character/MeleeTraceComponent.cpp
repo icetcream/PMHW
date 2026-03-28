@@ -501,6 +501,21 @@ bool UMeleeTraceComponent::HasCachedPhysicalDamageSpec() const
 	return bHasCachedPhysicalDamageSpec;
 }
 
+void UMeleeTraceComponent::SetCachedAttackDisplayName(const FText& InAttackDisplayName)
+{
+	CachedAttackDisplayName = InAttackDisplayName;
+}
+
+void UMeleeTraceComponent::ClearCachedAttackDisplayName()
+{
+	CachedAttackDisplayName = FText::GetEmpty();
+}
+
+FString UMeleeTraceComponent::GetCachedAttackDisplayName() const
+{
+	return CachedAttackDisplayName.IsEmpty() ? FString() : CachedAttackDisplayName.ToString();
+}
+
 void UMeleeTraceComponent::StopTrace()
 {
 	bIsTracing = false;
@@ -622,7 +637,13 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 								? SourceCombatComponent->BuildResolvedOutgoingPhysicalDamageSpec(RuntimeDamageSpec, TargetCombatComponent)
 								: RuntimeDamageSpec;
 
-							UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(HitActor, GetOwner(), ResolvedDamageSpec, true, Hit.ImpactPoint);
+							UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(
+								HitActor,
+								GetOwner(),
+								ResolvedDamageSpec,
+								true,
+								Hit.ImpactPoint,
+								GetCachedAttackDisplayName());
 						}
 						ApplyHitStop(HitActor);
 					}

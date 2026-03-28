@@ -18,7 +18,7 @@ void UMHWAnimInstance::InitializeWithAbilitySystem(UAbilitySystemComponent* ASC)
 {
 	if (!ASC) return;
 
-	if (CachedASC.Get() == ASC && ChargeTagDelegateHandle.IsValid())
+	if (CachedASC.Get() == ASC && ChargeParentTagDelegateHandle.IsValid())
 	{
 		UpdateChargingTypeFromTags();
 		return;
@@ -27,9 +27,15 @@ void UMHWAnimInstance::InitializeWithAbilitySystem(UAbilitySystemComponent* ASC)
 	UnbindFromAbilitySystem();
 	CachedASC = ASC;
 
-	// 1. 监听父级 Tag "State.Combat.Charging"
-	// 因为子 Tag (如 XLZ) 添加时，父级 Tag 的计数也会变化，所以我们监听这一个就够了！
-	ChargeTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::NewOrRemoved)
+	// 监听父级与具体蓄力阶段 Tag。
+	// 仅监听父级会在阶段切换时漏掉更新，导致动画出现 3 段瞬间跳回 1 段。
+	ChargeParentTagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::AnyCountChange)
+		.AddUObject(this, &UMHWAnimInstance::OnChargeTagChanged);
+	ChargeLevel1TagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ, EGameplayTagEventType::AnyCountChange)
+		.AddUObject(this, &UMHWAnimInstance::OnChargeTagChanged);
+	ChargeLevel2TagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ2, EGameplayTagEventType::AnyCountChange)
+		.AddUObject(this, &UMHWAnimInstance::OnChargeTagChanged);
+	ChargeLevel3TagDelegateHandle = ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ3, EGameplayTagEventType::AnyCountChange)
 		.AddUObject(this, &UMHWAnimInstance::OnChargeTagChanged);
 
 	// 2. 初始化时，先手动拉取一次状态 (防止动画实例创建晚于 Tag 的添加)
@@ -104,6 +110,7 @@ void UMHWAnimInstance::OnChargeTagChanged(const FGameplayTag CallbackTag, int32 
 
 void UMHWAnimInstance::UpdateChargingTypeFromTags()
 {
+	const ECombatChargingType PreviousChargingType = CurrentCombatChargingType;
 
 	// 1. 尝试获取缓存的 ASC
 	UAbilitySystemComponent* ASC = CachedASC.Get();
@@ -152,16 +159,24 @@ void UMHWAnimInstance::UpdateChargingTypeFromTags()
 	}
 	else
 	{
-		// 兜底防错 (万一打了父 Tag 却没打任何子 Tag)
-		
-		// ！！！注意这里我把你之前的代码改了 ！！！
-		// 既然它有父级 Tag，说明它肯定是在蓄力，只是没找到对应的招式。
-		// 把它重置为“未蓄力”会导致动画直接退出！
-		// 正确的做法是：给它一个默认的 1 段蓄力动作，这样你至少能看到动画在播。
-		CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ1;
-		
-		// 打印紫色警告：发现父 Tag 但找不到子 Tag！
-		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Magenta, TEXT("异常：有 Charging 父级 Tag，但没找到 XLZ1/2/3 子 Tag！强制使用 1段")); }
+		// 阶段切换时可能会出现一帧父 Tag 还在、具体阶段 Tag 还没补上的情况。
+		// 这时保持上一次有效阶段，避免 3 段瞬间闪回 1 段。
+		if (PreviousChargingType != ECombatChargingType::CombatNotCharging)
+		{
+			CurrentCombatChargingType = PreviousChargingType;
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Magenta, TEXT("Charging 阶段 Tag 短暂缺失，保持上一阶段"));
+			}
+		}
+		else
+		{
+			CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ1;
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Magenta, TEXT("Charging 父级 Tag 已存在但没有具体阶段，默认使用 1段"));
+			}
+		}
 	}
 }
 
@@ -169,13 +184,34 @@ void UMHWAnimInstance::UnbindFromAbilitySystem()
 {
 	if (UAbilitySystemComponent* ASC = CachedASC.Get())
 	{
-		if (ChargeTagDelegateHandle.IsValid())
+		if (ChargeParentTagDelegateHandle.IsValid())
 		{
-			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::NewOrRemoved)
-				.Remove(ChargeTagDelegateHandle);
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::AnyCountChange)
+				.Remove(ChargeParentTagDelegateHandle);
+		}
+
+		if (ChargeLevel1TagDelegateHandle.IsValid())
+		{
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ, EGameplayTagEventType::AnyCountChange)
+				.Remove(ChargeLevel1TagDelegateHandle);
+		}
+
+		if (ChargeLevel2TagDelegateHandle.IsValid())
+		{
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ2, EGameplayTagEventType::AnyCountChange)
+				.Remove(ChargeLevel2TagDelegateHandle);
+		}
+
+		if (ChargeLevel3TagDelegateHandle.IsValid())
+		{
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ3, EGameplayTagEventType::AnyCountChange)
+				.Remove(ChargeLevel3TagDelegateHandle);
 		}
 	}
 
-	ChargeTagDelegateHandle.Reset();
+	ChargeParentTagDelegateHandle.Reset();
+	ChargeLevel1TagDelegateHandle.Reset();
+	ChargeLevel2TagDelegateHandle.Reset();
+	ChargeLevel3TagDelegateHandle.Reset();
 	CachedASC.Reset();
 }

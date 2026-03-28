@@ -172,7 +172,7 @@ bool UMHWCombatComponent::ApplyRawDamage(float DamageAmount)
 	return ApplyPhysicalDamage(nullptr, DamageSpec);
 }
 
-bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation)
+bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation, FString AttackDisplayName)
 {
 	if (DamageSpec.TrueRawAttack <= 0.0f)
 	{
@@ -203,6 +203,17 @@ bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhy
 			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
 			{
 				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
+			}
+		}
+	}
+
+	if (!AttackDisplayName.IsEmpty())
+	{
+		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
+		{
+			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
+			{
+				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetAttackDisplayName(AttackDisplayName);
 			}
 		}
 	}
@@ -278,14 +289,14 @@ void UMHWCombatComponent::ResetInitialAttributesEffectApplication()
 	InitialAttributesAppliedASC = nullptr;
 }
 
-void UMHWCombatComponent::NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation)
+void UMHWCombatComponent::NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation, const FString& AttackDisplayName)
 {
 	OnDamagedDetailed.Broadcast(SourceActor, GetOwner(), DamageAmount, NewHealth);
-	OnDamagedResultDetailed.Broadcast(SourceActor, GetOwner(), DamageAmount, NewHealth, CriticalHitType);
-	SpawnDamageNumberActor(DamageAmount, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+	OnDamagedResultDetailed.Broadcast(SourceActor, GetOwner(), DamageAmount, NewHealth, CriticalHitType, AttackDisplayName);
+	SpawnDamageNumberActor(DamageAmount, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation, AttackDisplayName);
 }
 
-void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation) const
+void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName) const
 {
 	if (!bSpawnDamageNumberOnDamage || !DamageNumberActorClass)
 	{
@@ -306,7 +317,7 @@ void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCritica
 	const FVector SpawnLocation = bHasDamageNumberWorldLocation ? DamageNumberWorldLocation : OwnerActor->GetActorLocation();
 	if (AMHWDamageNumberActor* DamageNumberActor = World->SpawnActor<AMHWDamageNumberActor>(DamageNumberActorClass, SpawnLocation, FRotator::ZeroRotator, SpawnParameters))
 	{
-		DamageNumberActor->InitializeDamageNumber(OwnerActor, DamageAmount, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+		DamageNumberActor->InitializeDamageNumber(OwnerActor, DamageAmount, CriticalHitType, AttackDisplayName, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
 	}
 }
 

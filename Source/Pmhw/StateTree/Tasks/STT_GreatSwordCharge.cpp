@@ -4,15 +4,56 @@
 // 必须包含 GAS 相关的头文件
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Character/MHWAttackComponent.h"
 #include "Character/MHWCharacter.h"
 #include "MHWGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Interface/CombatAnimInterface.h"
+#include "Interface/MHWCharacterInterface.h"
 
 namespace GreatSwordChargeTask
 {
 	static const FName ChargeSmashTargetName(TEXT("ChargeSmashTarget"));
+
+	static float ResolveNormalizedChargeRatio(const FSTT_GreatSwordCharge& Task, const float ChargeTime)
+	{
+		if (Task.MaxChargeDuration <= KINDA_SMALL_NUMBER)
+		{
+			return 1.0f;
+		}
+
+		return FMath::Clamp(ChargeTime / Task.MaxChargeDuration, 0.0f, 1.0f);
+	}
+
+	static bool ResolvePendingChargeLevel(const FSTT_GreatSwordCharge& Task, const float ChargeTime, EMHWChargeLevel& OutChargeLevel)
+	{
+		const float NormalizedChargeRatio = ResolveNormalizedChargeRatio(Task, ChargeTime);
+		const float EffectiveChargeLevel2Threshold = FMath::Clamp(Task.ChargeLevel2Threshold, 0.0f, 1.0f);
+		const float EffectiveChargeLevel3Threshold = FMath::Clamp(Task.ChargeLevel3Threshold, EffectiveChargeLevel2Threshold, 1.0f);
+		const float EffectiveOverchargeThreshold = FMath::Clamp(Task.OverchargeThreshold, EffectiveChargeLevel3Threshold, 1.0f);
+
+		if (NormalizedChargeRatio >= EffectiveOverchargeThreshold)
+		{
+			OutChargeLevel = EMHWChargeLevel::Overcharged;
+			return true;
+		}
+
+		if (NormalizedChargeRatio >= EffectiveChargeLevel3Threshold)
+		{
+			OutChargeLevel = EMHWChargeLevel::Level3;
+			return true;
+		}
+
+		if (NormalizedChargeRatio >= EffectiveChargeLevel2Threshold)
+		{
+			OutChargeLevel = EMHWChargeLevel::Level2;
+			return true;
+		}
+
+		OutChargeLevel = EMHWChargeLevel::Level1;
+		return true;
+	}
 }
 
 EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
@@ -43,6 +84,15 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 		{
 			ASC->AddLooseGameplayTag(SpecificChargeTag);
 			InstanceData.bOwnsSpecificChargeTag = true;
+		}
+	}
+
+	if (Character->Implements<UMHWCharacterInterface>())
+	{
+		if (UMHWAttackComponent* AttackComponent = IMHWCharacterInterface::Execute_GetAttackComponent(Character))
+		{
+			// A new charge attempt supersedes any unresolved previous charge result.
+			AttackComponent->ClearPendingChargeLevel();
 		}
 	}
 
@@ -172,6 +222,22 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 			if (bUseMotiongWarping)
 			{
 				MHWCharacter->SetPendingMotionWarpTarget(GreatSwordChargeTask::ChargeSmashTargetName, TargetTransform);
+			}
+		}
+
+		if (Character->Implements<UMHWCharacterInterface>())
+		{
+			if (UMHWAttackComponent* AttackComponent = IMHWCharacterInterface::Execute_GetAttackComponent(Character))
+			{
+				EMHWChargeLevel PendingChargeLevel;
+				if (GreatSwordChargeTask::ResolvePendingChargeLevel(*this, InstanceData.CurrentChargeTime, PendingChargeLevel))
+				{
+					AttackComponent->SetPendingChargeLevel(PendingChargeLevel);
+				}
+				else
+				{
+					AttackComponent->ClearPendingChargeLevel();
+				}
 			}
 		}
 	}

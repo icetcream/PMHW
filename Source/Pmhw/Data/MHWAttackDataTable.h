@@ -13,6 +13,9 @@ struct PMHW_API FMHWAttackDataRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Attack", meta = (DisplayName = "攻击规格标签", Categories = "Data.AttackSpec"))
 	FGameplayTag AttackSpecTag;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Attack", meta = (DisplayName = "招式名称"))
+	FText AttackDisplayName;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Attack", meta = (DisplayName = "耐力消耗", ClampMin = "0.0"))
 	float StaminaCost = 0.0f;
 

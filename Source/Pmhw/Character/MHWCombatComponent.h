@@ -14,7 +14,7 @@ struct FOnAttributeChangeData;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FMHWAttributeChangedSignature, float, NewValue, float, MaxValue, float, DeltaValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMHWDamageSignature, float, DamageAmount, float, NewHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FMHWDamageDetailedSignature, AActor*, SourceActor, AActor*, TargetActor, float, DamageAmount, float, NewHealth);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FMHWDamageResultDetailedSignature, AActor*, SourceActor, AActor*, TargetActor, float, DamageAmount, float, NewHealth, EMHWCriticalHitType, CriticalHitType);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(FMHWDamageResultDetailedSignature, AActor*, SourceActor, AActor*, TargetActor, float, DamageAmount, float, NewHealth, EMHWCriticalHitType, CriticalHitType, const FString&, AttackDisplayName);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMHWDeathSignature);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -68,7 +68,7 @@ public:
 	bool ApplyRawDamage(float DamageAmount);
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
-	bool ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation = false, FVector DamageNumberWorldLocation = FVector::ZeroVector);
+	bool ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation = false, FVector DamageNumberWorldLocation = FVector::ZeroVector, FString AttackDisplayName = TEXT(""));
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
 	void ResetVitalsToMax();
@@ -121,10 +121,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Damage Number", meta = (EditCondition = "bSpawnDamageNumberOnDamage"))
 	TSubclassOf<AMHWDamageNumberActor> DamageNumberActorClass;
 
-	void NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation);
+	void NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation, const FString& AttackDisplayName);
 
 private:
-	void SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation) const;
+	void SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName) const;
 	bool TryInitializeFromOwner();
 	void HandleAutomaticStaminaRegen(float DeltaSeconds);
 	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);

@@ -12,6 +12,15 @@ class UMHWHitStopData;
 class UMeleeTraceComponent;
 struct FHitResult;
 
+UENUM(BlueprintType)
+enum class EMHWChargeLevel : uint8
+{
+	Level1 UMETA(DisplayName = "1蓄"),
+	Level2 UMETA(DisplayName = "2蓄"),
+	Level3 UMETA(DisplayName = "3蓄"),
+	Overcharged UMETA(DisplayName = "过蓄")
+};
+
 USTRUCT(BlueprintType)
 struct PMHW_API FMHWAttackRuntimeContext
 {
@@ -140,12 +149,34 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MHW|Attack")
 	bool HasWindowHit(int32 WindowIndex) const;
 
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attack")
+	void SetPendingChargeLevel(EMHWChargeLevel InChargeLevel);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attack")
+	void ClearPendingChargeLevel();
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attack")
+	bool PeekPendingChargeLevel(EMHWChargeLevel& OutChargeLevel) const;
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attack")
+	bool ConsumePendingChargeLevel(EMHWChargeLevel& OutChargeLevel);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attack")
+	void SetActiveAttackSpecTagOverride(FGameplayTag InAttackSpecTag);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Attack")
+	void ClearActiveAttackSpecTagOverride();
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Attack")
+	bool GetActiveAttackSpecTagOverride(FGameplayTag& OutAttackSpecTag) const;
+
 private:
 	bool TryInitializeFromOwner();
 	void StopTraceAndClearDamageSpec();
 	FMHWPhysicalDamageSpec BuildDamageSpecForWindow(const FMHWAttackWindowSpec& WindowSpec) const;
-	void ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FMHWPhysicalDamageSpec& ResolvedDamageSpec);
+	void ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FGameplayTag& ResolvedAttackSpecTag, const FMHWPhysicalDamageSpec& ResolvedDamageSpec);
 	int32 ResolveBonusCheckWindowIndex(const FMHWAttackWindowSpec& WindowSpec) const;
+	FGameplayTag ResolveAttackSpecTagForCurrentAction(const FGameplayTag& DefaultAttackSpecTag) const;
 
 	UFUNCTION()
 	void HandleMeleeHit(const FHitResult& HitResult);
@@ -161,4 +192,13 @@ private:
 
 	UPROPERTY(Transient)
 	FMHWAttackWindowSpec ActiveWindowSpec;
+
+	UPROPERTY(Transient)
+	bool bHasPendingChargeLevel = false;
+
+	UPROPERTY(Transient)
+	EMHWChargeLevel PendingChargeLevel = EMHWChargeLevel::Level1;
+
+	UPROPERTY(Transient)
+	FGameplayTag ActiveAttackSpecTagOverride;
 };

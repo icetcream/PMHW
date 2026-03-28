@@ -30,14 +30,27 @@ bool FMHWGameplayEffectContext::NetSerialize(FArchive& Ar, UPackageMap* Map, boo
 	uint8 bHasLocationBit = bHasDamageNumberWorldLocation ? 1 : 0;
 	Ar.SerializeBits(&bHasLocationBit, 1);
 
+	uint8 bHasAttackDisplayNameBit = bHasAttackDisplayName ? 1 : 0;
+	Ar.SerializeBits(&bHasAttackDisplayNameBit, 1);
+
 	if (Ar.IsLoading())
 	{
 		bHasDamageNumberWorldLocation = bHasLocationBit != 0;
+		bHasAttackDisplayName = bHasAttackDisplayNameBit != 0;
 	}
 
 	if (bHasDamageNumberWorldLocation)
 	{
 		Ar << DamageNumberWorldLocation;
+	}
+
+	if (bHasAttackDisplayName)
+	{
+		Ar << AttackDisplayName;
+	}
+	else if (Ar.IsLoading())
+	{
+		AttackDisplayName.Reset();
 	}
 
 	if (Ar.IsLoading())

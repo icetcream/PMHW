@@ -64,7 +64,10 @@ private:
 	void OnChargeTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
 	// 保存委托绑定的句柄，以便清理
-	FDelegateHandle ChargeTagDelegateHandle;
+	FDelegateHandle ChargeParentTagDelegateHandle;
+	FDelegateHandle ChargeLevel1TagDelegateHandle;
+	FDelegateHandle ChargeLevel2TagDelegateHandle;
+	FDelegateHandle ChargeLevel3TagDelegateHandle;
 
 	// 一个辅助函数，用于在 Tag 变化时重新计算当前处于哪种枚举状态
 	void UpdateChargingTypeFromTags();

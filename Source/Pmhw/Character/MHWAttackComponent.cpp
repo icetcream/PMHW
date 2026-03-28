@@ -42,6 +42,7 @@ void UMHWAttackComponent::EndAttack()
 	StopTraceAndClearDamageSpec();
 	ActiveWindowSpec = FMHWAttackWindowSpec();
 	AttackRuntimeContext.Reset();
+	ClearActiveAttackSpecTagOverride();
 }
 
 bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSpec)
@@ -73,11 +74,34 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 		return false;
 	}
 
+	const FGameplayTag ResolvedAttackSpecTag = ResolveAttackSpecTagForCurrentAction(WindowSpec.AttackSpecTag);
 	const FMHWPhysicalDamageSpec ResolvedDamageSpec = BuildDamageSpecForWindow(WindowSpec);
 
 	CachedMeleeTraceComponent->SetCachedPhysicalDamageSpec(ResolvedDamageSpec);
+	if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(ResolvedAttackSpecTag))
+	{
+		if (!AttackDataRow->AttackDisplayName.IsEmpty())
+		{
+			CachedMeleeTraceComponent->SetCachedAttackDisplayName(AttackDataRow->AttackDisplayName);
+		}
+		else
+		{
+			CachedMeleeTraceComponent->SetCachedAttackDisplayName(FText::FromString(ResolvedAttackSpecTag.ToString()));
+		}
+	}
+	else
+	{
+		if (ResolvedAttackSpecTag.IsValid())
+		{
+			CachedMeleeTraceComponent->SetCachedAttackDisplayName(FText::FromString(ResolvedAttackSpecTag.ToString()));
+		}
+		else
+		{
+			CachedMeleeTraceComponent->ClearCachedAttackDisplayName();
+		}
+	}
 	CachedMeleeTraceComponent->SetHitVFXSpec(WindowSpec.HitVFX);
-	ConfigureHitstopForWindow(WindowSpec, ResolvedDamageSpec);
+	ConfigureHitstopForWindow(WindowSpec, ResolvedAttackSpecTag, ResolvedDamageSpec);
 	CachedMeleeTraceComponent->StartTrace(ResolvedBaseSocket, ResolvedTraceSockets);
 	return true;
 }
@@ -113,6 +137,53 @@ void UMHWAttackComponent::NotifyCurrentWindowHit(AActor* HitActor)
 bool UMHWAttackComponent::HasWindowHit(int32 WindowIndex) const
 {
 	return AttackRuntimeContext.HasWindowHit(WindowIndex);
+}
+
+void UMHWAttackComponent::SetPendingChargeLevel(const EMHWChargeLevel InChargeLevel)
+{
+	PendingChargeLevel = InChargeLevel;
+	bHasPendingChargeLevel = true;
+}
+
+void UMHWAttackComponent::ClearPendingChargeLevel()
+{
+	bHasPendingChargeLevel = false;
+	PendingChargeLevel = EMHWChargeLevel::Level1;
+}
+
+bool UMHWAttackComponent::PeekPendingChargeLevel(EMHWChargeLevel& OutChargeLevel) const
+{
+	OutChargeLevel = PendingChargeLevel;
+	return bHasPendingChargeLevel;
+}
+
+bool UMHWAttackComponent::ConsumePendingChargeLevel(EMHWChargeLevel& OutChargeLevel)
+{
+	if (!bHasPendingChargeLevel)
+	{
+		OutChargeLevel = EMHWChargeLevel::Level1;
+		return false;
+	}
+
+	OutChargeLevel = PendingChargeLevel;
+	ClearPendingChargeLevel();
+	return true;
+}
+
+void UMHWAttackComponent::SetActiveAttackSpecTagOverride(const FGameplayTag InAttackSpecTag)
+{
+	ActiveAttackSpecTagOverride = InAttackSpecTag;
+}
+
+void UMHWAttackComponent::ClearActiveAttackSpecTagOverride()
+{
+	ActiveAttackSpecTagOverride = FGameplayTag::EmptyTag;
+}
+
+bool UMHWAttackComponent::GetActiveAttackSpecTagOverride(FGameplayTag& OutAttackSpecTag) const
+{
+	OutAttackSpecTag = ActiveAttackSpecTagOverride;
+	return ActiveAttackSpecTagOverride.IsValid();
 }
 
 bool UMHWAttackComponent::TryInitializeFromOwner()
@@ -154,6 +225,7 @@ void UMHWAttackComponent::StopTraceAndClearDamageSpec()
 
 	CachedMeleeTraceComponent->StopTrace();
 	CachedMeleeTraceComponent->ClearCachedPhysicalDamageSpec();
+	CachedMeleeTraceComponent->ClearCachedAttackDisplayName();
 	CachedMeleeTraceComponent->ClearHitVFXSpec();
 	CachedMeleeTraceComponent->ClearHitStopConfig();
 }
@@ -164,9 +236,10 @@ FMHWPhysicalDamageSpec UMHWAttackComponent::BuildDamageSpecForWindow(const FMHWA
 	ResolvedDamageSpec.TrueRawAttack = 0.0f;
 	ResolvedDamageSpec.MotionValue = 0.0f;
 
-	if (CachedMeleeTraceComponent && WindowSpec.AttackSpecTag.IsValid())
+	const FGameplayTag EffectiveAttackSpecTag = ResolveAttackSpecTagForCurrentAction(WindowSpec.AttackSpecTag);
+	if (CachedMeleeTraceComponent && EffectiveAttackSpecTag.IsValid())
 	{
-		if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(WindowSpec.AttackSpecTag))
+		if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(EffectiveAttackSpecTag))
 		{
 			ResolvedDamageSpec.MotionValue = AttackDataRow->MotionValue;
 		}
@@ -184,14 +257,15 @@ FMHWPhysicalDamageSpec UMHWAttackComponent::BuildDamageSpecForWindow(const FMHWA
 	return ResolvedDamageSpec;
 }
 
-void UMHWAttackComponent::ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FMHWPhysicalDamageSpec& ResolvedDamageSpec)
+void UMHWAttackComponent::ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FGameplayTag& ResolvedAttackSpecTag,
+	const FMHWPhysicalDamageSpec& ResolvedDamageSpec)
 {
 	if (!CachedMeleeTraceComponent)
 	{
 		return;
 	}
 
-	if (!WindowSpec.AttackSpecTag.IsValid())
+	if (!ResolvedAttackSpecTag.IsValid())
 	{
 		CachedMeleeTraceComponent->ClearHitStopConfig();
 		return;
@@ -215,6 +289,13 @@ int32 UMHWAttackComponent::ResolveBonusCheckWindowIndex(const FMHWAttackWindowSp
 	return WindowSpec.PreviousWindowIndexOverride != INDEX_NONE
 		? WindowSpec.PreviousWindowIndexOverride
 		: (WindowSpec.WindowIndex - 1);
+}
+
+FGameplayTag UMHWAttackComponent::ResolveAttackSpecTagForCurrentAction(const FGameplayTag& DefaultAttackSpecTag) const
+{
+	return ActiveAttackSpecTagOverride.IsValid()
+		? ActiveAttackSpecTagOverride
+		: DefaultAttackSpecTag;
 }
 
 void UMHWAttackComponent::HandleMeleeHit(const FHitResult& HitResult)

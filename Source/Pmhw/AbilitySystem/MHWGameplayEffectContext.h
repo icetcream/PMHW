@@ -27,6 +27,15 @@ public:
 	bool HasDamageNumberWorldLocation() const { return bHasDamageNumberWorldLocation; }
 	const FVector& GetDamageNumberWorldLocation() const { return DamageNumberWorldLocation; }
 
+	void SetAttackDisplayName(const FString& InAttackDisplayName)
+	{
+		AttackDisplayName = InAttackDisplayName;
+		bHasAttackDisplayName = !AttackDisplayName.IsEmpty();
+	}
+
+	bool HasAttackDisplayName() const { return bHasAttackDisplayName; }
+	const FString& GetAttackDisplayName() const { return AttackDisplayName; }
+
 private:
 	UPROPERTY()
 	EMHWCriticalHitType CriticalHitType = EMHWCriticalHitType::None;
@@ -36,6 +45,12 @@ private:
 
 	UPROPERTY()
 	FVector DamageNumberWorldLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	bool bHasAttackDisplayName = false;
+
+	UPROPERTY()
+	FString AttackDisplayName;
 };
 
 template <>

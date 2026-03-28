@@ -78,6 +78,12 @@ public:
 
 	bool HasCachedPhysicalDamageSpec() const;
 
+	void SetCachedAttackDisplayName(const FText& InAttackDisplayName);
+
+	void ClearCachedAttackDisplayName();
+
+	FString GetCachedAttackDisplayName() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace|VFX")
 	void SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec);
 
@@ -180,4 +186,7 @@ private:
 
 	UPROPERTY(Transient)
 	bool bHasCachedPhysicalDamageSpec = false;
+
+	UPROPERTY(Transient)
+	FText CachedAttackDisplayName;
 };

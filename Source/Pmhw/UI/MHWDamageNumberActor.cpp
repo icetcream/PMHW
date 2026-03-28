@@ -53,11 +53,12 @@ void AMHWDamageNumberActor::Tick(float DeltaSeconds)
 	UpdateFacingRotation();
 }
 
-void AMHWDamageNumberActor::InitializeDamageNumber(AActor* InTargetActor, float InDamageAmount, EMHWCriticalHitType InCriticalHitType, bool bInHasCustomSpawnLocation, FVector InCustomSpawnLocation)
+void AMHWDamageNumberActor::InitializeDamageNumber(AActor* InTargetActor, float InDamageAmount, EMHWCriticalHitType InCriticalHitType, FString InAttackDisplayName, bool bInHasCustomSpawnLocation, FVector InCustomSpawnLocation)
 {
 	TargetActor = InTargetActor;
 	DamageAmount = InDamageAmount;
 	CriticalHitType = InCriticalHitType;
+	AttackDisplayName = InAttackDisplayName;
 	bHasCustomSpawnLocation = bInHasCustomSpawnLocation;
 	CustomSpawnLocation = InCustomSpawnLocation;
 	ElapsedLifetime = 0.0f;
@@ -86,7 +87,7 @@ void AMHWDamageNumberActor::PushDamageNumberToWidget()
 {
 	if (UMHWDamageNumberWidget* DamageNumberWidget = Cast<UMHWDamageNumberWidget>(WidgetComponent->GetUserWidgetObject()))
 	{
-		DamageNumberWidget->SetDamageNumber(DamageAmount, CriticalHitType);
+		DamageNumberWidget->SetDamageNumber(DamageAmount, CriticalHitType, FText::FromString(AttackDisplayName));
 	}
 }
 

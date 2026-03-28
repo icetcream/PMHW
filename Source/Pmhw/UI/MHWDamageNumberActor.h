@@ -21,7 +21,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|UI|Damage Number")
-	void InitializeDamageNumber(AActor* InTargetActor, float InDamageAmount, EMHWCriticalHitType InCriticalHitType, bool bHasCustomSpawnLocation = false, FVector InCustomSpawnLocation = FVector::ZeroVector);
+	void InitializeDamageNumber(AActor* InTargetActor, float InDamageAmount, EMHWCriticalHitType InCriticalHitType, FString InAttackDisplayName = TEXT(""), bool bHasCustomSpawnLocation = false, FVector InCustomSpawnLocation = FVector::ZeroVector);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|UI")
@@ -69,6 +69,9 @@ private:
 
 	UPROPERTY(Transient)
 	EMHWCriticalHitType CriticalHitType = EMHWCriticalHitType::None;
+
+	UPROPERTY(Transient)
+	FString AttackDisplayName;
 
 	UPROPERTY(Transient)
 	FVector StartLocation = FVector::ZeroVector;
