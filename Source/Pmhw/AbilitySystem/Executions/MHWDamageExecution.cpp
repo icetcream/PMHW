@@ -1,6 +1,7 @@
 #include "AbilitySystem/Executions/MHWDamageExecution.h"
 
 #include "AbilitySystem/Attributes/MHWCombatAttributeSet.h"
+#include "AbilitySystem/MHWGameplayEffectContext.h"
 #include "GameplayEffectExtension.h"
 #include "MHWGameplayTags.h"
 
@@ -20,7 +21,7 @@ void UMHWDamageExecution::Execute_Implementation(
 	const float MotionValue = FMath::Max(0.0f, OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, false, 100.0f));
 	const float MotionValueScale = FMath::Max(0.0f, OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, false, 1.0f));
 	const float SharpnessMultiplier = FMath::Max(0.0f, OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, false, 1.0f));
-	const float AffinityChance = FMath::Clamp(OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::AffinityChance, false, 0.0f), -100.0f, 100.0f);
+	const float CriticalChance = FMath::Clamp(OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, false, 0.0f), -100.0f, 100.0f);
 	const float PositiveCriticalMultiplier = FMath::Max(0.0f, OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, false, 1.25f));
 	const float NegativeCriticalMultiplier = FMath::Max(0.0f, OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, false, 0.75f));
 	const float CriticalMultiplierOverride = OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, false, -1.0f);
@@ -32,22 +33,39 @@ void UMHWDamageExecution::Execute_Implementation(
 	const float AdditionalMultiplier = FMath::Max(0.0f, OwningSpec.GetSetByCallerMagnitude(MHWDamageDataTags::AdditionalMultiplier, false, 1.0f));
 
 	float CriticalMultiplier = 1.0f;
+	EMHWCriticalHitType CriticalHitType = EMHWCriticalHitType::None;
 	if (CriticalMultiplierOverride >= 0.0f)
 	{
 		CriticalMultiplier = CriticalMultiplierOverride;
-	}
-	else if (AffinityChance > 0.0f)
-	{
-		if (FMath::FRandRange(0.0f, 100.0f) <= AffinityChance)
+		if (!FMath::IsNearlyEqual(CriticalMultiplierOverride, 1.0f))
 		{
-			CriticalMultiplier = PositiveCriticalMultiplier;
+			CriticalHitType = CriticalMultiplierOverride > 1.0f
+				? EMHWCriticalHitType::Positive
+				: EMHWCriticalHitType::Negative;
 		}
 	}
-	else if (AffinityChance < 0.0f)
+	else if (CriticalChance > 0.0f)
 	{
-		if (FMath::FRandRange(0.0f, 100.0f) <= FMath::Abs(AffinityChance))
+		if (FMath::FRandRange(0.0f, 100.0f) <= CriticalChance)
+		{
+			CriticalMultiplier = PositiveCriticalMultiplier;
+			CriticalHitType = EMHWCriticalHitType::Positive;
+		}
+	}
+	else if (CriticalChance < 0.0f)
+	{
+		if (FMath::FRandRange(0.0f, 100.0f) <= FMath::Abs(CriticalChance))
 		{
 			CriticalMultiplier = NegativeCriticalMultiplier;
+			CriticalHitType = EMHWCriticalHitType::Negative;
+		}
+	}
+
+	if (FGameplayEffectContext* EffectContext = OwningSpec.GetContext().Get())
+	{
+		if (EffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
+		{
+			static_cast<FMHWGameplayEffectContext*>(EffectContext)->SetCriticalHitType(CriticalHitType);
 		}
 	}
 

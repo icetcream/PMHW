@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h" // 需要包含 GameplayTags 模块
 #include "MHWComboPreInputComponent.h"
 #include "MHWGameplayTags.h"
+#include "Character/MHWPlayerCombatComponent.h"
 #include "Interface/MHWCharacterInterface.h"
 #include "Settings/MovementSettings.h"
 #include "state/MHWLocomotionState.h"
@@ -78,7 +79,7 @@ public:
 	void RestoreStamina(float Amount);
 
 	UFUNCTION(BlueprintPure, Category = "MHW|Attributes")
-	UMHWCombatComponent* GetCombatComponent() const { return MHWCombatComponent; }
+	UMHWCombatComponent* GetCombatComponent() const { return MHWCombatComponent.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
 	UMHWAttackComponent* GetAttackComponentInstance() const { return MHWAttackComponent; }
@@ -279,7 +280,7 @@ private:
 	TObjectPtr<UMHWAttackComponent> MHWAttackComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UMHWCombatComponent> MHWCombatComponent;
+	TObjectPtr<UMHWPlayerCombatComponent> MHWCombatComponent;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;

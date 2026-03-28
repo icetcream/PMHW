@@ -3,6 +3,7 @@
 #include "GameFramework/Actor.h"
 #include "DrawDebugHelpers.h"
 #include "AbilitySystem/MHWCombatBlueprintLibrary.h"
+#include "Data/MHWAttackDataTable.h"
 #include "Data/MHWHitStopData.h"
 #include "Engine/World.h"
 #include "Equipment/MHWEquipmentDefinition.h"
@@ -11,6 +12,11 @@
 #include "Interface/MHWCharacterInterface.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Character/MHWCombatComponent.h"
+#include "Character/MHWMonsterCombatComponent.h"
+#include "Character/MHWPlayerCombatComponent.h"
 
 
 UMeleeTraceComponent::UMeleeTraceComponent()
@@ -46,37 +52,244 @@ USkeletalMeshComponent* UMeleeTraceComponent::GetWeaponMesh()
 
 void UMeleeTraceComponent::ApplyHitStop(AActor* HitActor)
 {
-	// 1. 数据驱动拦截：如果没有配数据，或者配置了关闭，直接返回
-	if (!CurrentHitstopData || !CurrentHitstopData->bEnableHitstop || !CurrentHitstopData->HitstopCurve) 
+	if (!CurrentHitstopData || !CurrentHitstopData->bEnableHitstop)
+	{
 		return;
-	
+	}
+
 	UWorld* World = GetWorld();
 	AActor* OwnerActor = GetOwner();
-	if (!World || !OwnerActor) return;
-
-	// 2. 如果这是这招砍中的第一只怪（刚开始卡肉）
-	if (!bIsHitstopping)
+	if (!World || !OwnerActor)
 	{
-		// 记录攻击者原本的速度
+		return;
+	}
+
+	if (!IsHitstopActive())
+	{
 		DefaultTimeDilation = OwnerActor->CustomTimeDilation;
-		bIsHitstopping = true;
-		
-		// 记录此时的【真实世界时间】（不受 TimeDilation 影响的时间）
-		HitstopStartTime = World->GetRealTimeSeconds();
-
 		HitstopAffectedActors.Empty();
-		HitstopAffectedActors.Add(OwnerActor); // 攻击者自己必须卡肉
+		bHasOwnerMontageHitstop = false;
+		CachedOwnerAnimInstance.Reset();
+		CachedOwnerMontage.Reset();
+		CachedOwnerSkeletalMesh.Reset();
+		DefaultOwnerMontagePlayRate = 1.0f;
+		bOwnerMeshAnimationPausedByHitstop = false;
+		CurrentMeshFreezeDuration = 0.0f;
+
+		bHasOwnerMontageHitstop = InitializeOwnerMontageHitstop();
 	}
 
-	// 3. 把新砍中的怪物也加入卡肉大军
-	// （即使已经卡肉了，刀刃扫到第二只怪时，第二只怪也要瞬间被时间静止）
-	if (HitActor && !HitstopAffectedActors.Contains(HitActor))
+	if (CurrentHitstopData->bAffectOwnerTimeDilation)
 	{
-		HitstopAffectedActors.Add(HitActor);
+		AddHitstopAffectedActor(OwnerActor);
 	}
 
-	// 确保组件的 Tick 是开启的，否则曲线读不下去
-	SetComponentTickEnabled(true); 
+	if (CurrentHitstopData->bAffectHitTargetTimeDilation)
+	{
+		AddHitstopAffectedActor(HitActor);
+	}
+
+	const float FreezeDuration = GetScaledHitstopDuration(CurrentHitstopData->MeshFreezeDuration);
+	if (FreezeDuration > 0.0f)
+	{
+		BeginFreezeHitstop(FreezeDuration);
+	}
+	else
+	{
+		BeginRecoverHitstop(GetScaledHitstopDuration(CurrentHitstopData->MontageSlowDuration));
+	}
+}
+
+void UMeleeTraceComponent::AddHitstopAffectedActor(AActor* Actor)
+{
+	if (!Actor)
+	{
+		return;
+	}
+
+	if (bHasOwnerMontageHitstop && Actor == GetOwner())
+	{
+		return;
+	}
+
+	if (!HitstopAffectedActors.Contains(Actor))
+	{
+		HitstopAffectedActors.Add(Actor);
+	}
+
+	float CurrentMultiplier = 1.0f;
+	switch (HitstopPhase)
+	{
+	case EHitstopRuntimePhase::Freeze:
+		CurrentMultiplier = EvaluateCurrentTimeDilationMultiplier(0.0f);
+		break;
+	case EHitstopRuntimePhase::Recover:
+		{
+			const UWorld* World = GetWorld();
+			const float ElapsedRealTime = World ? (World->GetRealTimeSeconds() - HitstopPhaseStartTime) : 0.0f;
+			const float Alpha = HitstopPhaseDuration > 0.0f ? FMath::Clamp(ElapsedRealTime / HitstopPhaseDuration, 0.0f, 1.0f) : 1.0f;
+			CurrentMultiplier = EvaluateCurrentTimeDilationMultiplier(Alpha);
+		}
+		break;
+	case EHitstopRuntimePhase::None:
+	default:
+		break;
+	}
+
+	Actor->CustomTimeDilation = DefaultTimeDilation * CurrentMultiplier;
+}
+
+void UMeleeTraceComponent::ApplyCurrentHitstopMultiplier(float Multiplier)
+{
+	for (const TWeakObjectPtr<AActor>& WeakActor : HitstopAffectedActors)
+	{
+		if (AActor* Actor = WeakActor.Get())
+		{
+			Actor->CustomTimeDilation = DefaultTimeDilation * Multiplier;
+		}
+	}
+}
+
+bool UMeleeTraceComponent::InitializeOwnerMontageHitstop()
+{
+	AActor* OwnerActor = GetOwner();
+	USkeletalMeshComponent* OwnerSkeletalMesh = OwnerActor ? OwnerActor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+	UAnimInstance* OwnerAnimInstance = OwnerSkeletalMesh ? OwnerSkeletalMesh->GetAnimInstance() : nullptr;
+	if (!OwnerAnimInstance)
+	{
+		return false;
+	}
+
+	UAnimMontage* OwnerMontage = OwnerAnimInstance->GetCurrentActiveMontage();
+	if (!OwnerMontage)
+	{
+		return false;
+	}
+
+	CachedOwnerAnimInstance = OwnerAnimInstance;
+	CachedOwnerMontage = OwnerMontage;
+	CachedOwnerSkeletalMesh = OwnerSkeletalMesh;
+	DefaultOwnerMontagePlayRate = OwnerAnimInstance->Montage_GetPlayRate(OwnerMontage);
+	return true;
+}
+
+void UMeleeTraceComponent::SetOwnerMeshAnimationPaused(bool bPaused)
+{
+	if (USkeletalMeshComponent* OwnerSkeletalMesh = CachedOwnerSkeletalMesh.Get())
+	{
+		OwnerSkeletalMesh->bPauseAnims = bPaused;
+		bOwnerMeshAnimationPausedByHitstop = bPaused;
+	}
+}
+
+void UMeleeTraceComponent::UpdateOwnerMontagePlayRateForCurrentPhase(float PhaseAlpha) const
+{
+	if (!bHasOwnerMontageHitstop || !CurrentHitstopData)
+	{
+		return;
+	}
+
+	UAnimInstance* OwnerAnimInstance = CachedOwnerAnimInstance.Get();
+	UAnimMontage* OwnerMontage = CachedOwnerMontage.Get();
+	if (!OwnerAnimInstance || !OwnerMontage)
+	{
+		return;
+	}
+
+	const float TargetPlayRate = EvaluateCurrentMontagePlayRate(PhaseAlpha);
+	OwnerAnimInstance->Montage_SetPlayRate(OwnerMontage, DefaultOwnerMontagePlayRate * FMath::Max(0.0001f, TargetPlayRate));
+}
+
+float UMeleeTraceComponent::EvaluateCurrentTimeDilationMultiplier(float PhaseAlpha) const
+{
+	if (!CurrentHitstopData)
+	{
+		return 1.0f;
+	}
+
+	if (!CurrentHitstopData->bAffectOwnerTimeDilation && !CurrentHitstopData->bAffectHitTargetTimeDilation)
+	{
+		return 1.0f;
+	}
+
+	if (HitstopPhase == EHitstopRuntimePhase::Freeze)
+	{
+		return CurrentHitstopData->TimeDilationStartScale;
+	}
+
+	if (CurrentHitstopData->TimeDilationCurve)
+	{
+		return CurrentHitstopData->TimeDilationCurve->GetFloatValue(FMath::Clamp(PhaseAlpha, 0.0f, 1.0f));
+	}
+
+	return FMath::Lerp(CurrentHitstopData->TimeDilationStartScale, 1.0f, FMath::Clamp(PhaseAlpha, 0.0f, 1.0f));
+}
+
+float UMeleeTraceComponent::EvaluateCurrentMontagePlayRate(float PhaseAlpha) const
+{
+	if (!CurrentHitstopData)
+	{
+		return 1.0f;
+	}
+
+	if (HitstopPhase == EHitstopRuntimePhase::Freeze)
+	{
+		return CurrentHitstopData->MontageSlowStartPlayRate;
+	}
+
+	if (CurrentHitstopData->MontageSlowCurve)
+	{
+		return CurrentHitstopData->MontageSlowCurve->GetFloatValue(FMath::Clamp(PhaseAlpha, 0.0f, 1.0f));
+	}
+
+	return FMath::Lerp(CurrentHitstopData->MontageSlowStartPlayRate, 1.0f, FMath::Clamp(PhaseAlpha, 0.0f, 1.0f));
+}
+
+void UMeleeTraceComponent::BeginFreezeHitstop(float FreezeDuration)
+{
+	if (!CurrentHitstopData)
+	{
+		return;
+	}
+
+	HitstopPhase = EHitstopRuntimePhase::Freeze;
+	HitstopPhaseStartTime = GetWorld()->GetRealTimeSeconds();
+	HitstopPhaseDuration = FMath::Max(0.0f, FreezeDuration);
+	ApplyCurrentHitstopMultiplier(EvaluateCurrentTimeDilationMultiplier(0.0f));
+	if (bHasOwnerMontageHitstop)
+	{
+		CurrentMeshFreezeDuration = HitstopPhaseDuration;
+		SetOwnerMeshAnimationPaused(true);
+	}
+	UpdateOwnerMontagePlayRateForCurrentPhase(0.0f);
+	SetComponentTickEnabled(true);
+}
+
+void UMeleeTraceComponent::BeginRecoverHitstop(float RecoverDuration)
+{
+	HitstopPhase = EHitstopRuntimePhase::Recover;
+	HitstopPhaseStartTime = GetWorld()->GetRealTimeSeconds();
+	HitstopPhaseDuration = FMath::Max(0.0f, RecoverDuration);
+
+	if (!CurrentHitstopData || HitstopPhaseDuration <= 0.0f)
+	{
+		ResetHitStop();
+		return;
+	}
+
+	if (bOwnerMeshAnimationPausedByHitstop)
+	{
+		SetOwnerMeshAnimationPaused(false);
+	}
+
+	ApplyCurrentHitstopMultiplier(EvaluateCurrentTimeDilationMultiplier(0.0f));
+	UpdateOwnerMontagePlayRateForCurrentPhase(0.0f);
+	SetComponentTickEnabled(true);
+}
+
+float UMeleeTraceComponent::GetScaledHitstopDuration(float BaseDuration) const
+{
+	return FMath::Max(0.0f, BaseDuration * CurrentHitstopStrengthMultiplier);
 }
 
 void UMeleeTraceComponent::SpawnHitVFX(const FHitResult& HitResult) const
@@ -110,7 +323,9 @@ void UMeleeTraceComponent::SpawnHitVFX(const FHitResult& HitResult) const
 
 void UMeleeTraceComponent::ResetHitStop()
 {
-	bIsHitstopping = false;
+	HitstopPhase = EHitstopRuntimePhase::None;
+	HitstopPhaseStartTime = 0.0f;
+	HitstopPhaseDuration = 0.0f;
 
 	// 把所有被我们放慢的 Actor（主角和怪物）的速度恢复到打人前的状态
 	for (auto& WeakActor : HitstopAffectedActors)
@@ -122,9 +337,35 @@ void UMeleeTraceComponent::ResetHitStop()
 	}
 	HitstopAffectedActors.Empty();
 
+	if (bHasOwnerMontageHitstop)
+	{
+		if (UAnimInstance* OwnerAnimInstance = CachedOwnerAnimInstance.Get())
+		{
+			if (UAnimMontage* OwnerMontage = CachedOwnerMontage.Get())
+			{
+				OwnerAnimInstance->Montage_SetPlayRate(OwnerMontage, DefaultOwnerMontagePlayRate);
+			}
+		}
+	}
+
+	if (bOwnerMeshAnimationPausedByHitstop)
+	{
+		SetOwnerMeshAnimationPaused(false);
+	}
+
+	bHasOwnerMontageHitstop = false;
+	CachedOwnerAnimInstance.Reset();
+	CachedOwnerMontage.Reset();
+	CachedOwnerSkeletalMesh.Reset();
+	DefaultOwnerMontagePlayRate = 1.0f;
+	bOwnerMeshAnimationPausedByHitstop = false;
+	CurrentMeshFreezeDuration = 0.0f;
+
 	// 如果挥砍判定也早就结束了，为了省性能，关掉 Tick
 	if (!bIsTracing)
 	{
+		CurrentHitstopData = nullptr;
+		CurrentHitstopStrengthMultiplier = 1.0f;
 		SetComponentTickEnabled(false);
 	}
 }
@@ -137,11 +378,10 @@ void UMeleeTraceComponent::StartTrace(FName InBaseSocket, const TArray<FName>& I
 	// 如果武器没拿到，或者没配插槽，直接退出
 	if (!WeaponMesh || InTraceSockets.Num() == 0 || InBaseSocket.IsNone()) return;
 	
-	CurrentHitstopData = nullptr;
-	if (CachedEquipmentInstance)
+	if (!CurrentHitstopData && CachedEquipmentInstance)
 	{
-		// 这里调用你之前在 MHWEquipmentInstance 里写好的方法！
 		CurrentHitstopData = CachedEquipmentInstance->GetHitStopData();
+		CurrentHitstopStrengthMultiplier = 1.0f;
 	}
 
 	BaseSocketName = InBaseSocket;
@@ -190,13 +430,87 @@ bool UMeleeTraceComponent::ResolveTraceConfig(const FName& OverrideBaseSocket, c
 	return !OutBaseSocket.IsNone() && !OutTraceSockets.IsEmpty();
 }
 
+const FMHWAttackDataRow* UMeleeTraceComponent::FindAttackDataRowBySpecTag(const FGameplayTag& AttackSpecTag)
+{
+	GetWeaponMesh();
+
+	if (CachedEquipmentInstance)
+	{
+		return CachedEquipmentInstance->FindAttackDataRowBySpecTag(AttackSpecTag);
+	}
+
+	return nullptr;
+}
+
+const UMHWHitStopData* UMeleeTraceComponent::ResolveDefaultHitStopData(float MotionValue, bool bIsFinisher)
+{
+	GetWeaponMesh();
+
+	if (CachedEquipmentInstance)
+	{
+		return CachedEquipmentInstance->ResolveHitStopDataForMotionValue(MotionValue, bIsFinisher);
+	}
+
+	return nullptr;
+}
+
+float UMeleeTraceComponent::CalculateHitStopStrengthMultiplier(float HitzoneValue, bool bIsSleepHit, bool bIsFinisher)
+{
+	GetWeaponMesh();
+
+	if (CachedEquipmentInstance)
+	{
+		return CachedEquipmentInstance->CalculateHitStopStrengthMultiplier(HitzoneValue, bIsSleepHit, bIsFinisher);
+	}
+
+	return 1.0f;
+}
+
+void UMeleeTraceComponent::SetHitStopConfig(const UMHWHitStopData* InHitStopData, float InStrengthMultiplier)
+{
+	CurrentHitstopData = InHitStopData;
+	CurrentHitstopStrengthMultiplier = FMath::Max(0.0f, InStrengthMultiplier);
+}
+
+void UMeleeTraceComponent::ClearHitStopConfig()
+{
+	if (IsHitstopActive())
+	{
+		return;
+	}
+
+	CurrentHitstopData = nullptr;
+	CurrentHitstopStrengthMultiplier = 1.0f;
+}
+
+void UMeleeTraceComponent::SetCachedPhysicalDamageSpec(const FMHWPhysicalDamageSpec& InDamageSpec)
+{
+	CachedPhysicalDamageSpec = InDamageSpec;
+	bHasCachedPhysicalDamageSpec = true;
+}
+
+void UMeleeTraceComponent::ClearCachedPhysicalDamageSpec()
+{
+	CachedPhysicalDamageSpec = FMHWPhysicalDamageSpec();
+	CachedPhysicalDamageSpec.TrueRawAttack = 0.0f;
+	bHasCachedPhysicalDamageSpec = false;
+}
+
+bool UMeleeTraceComponent::HasCachedPhysicalDamageSpec() const
+{
+	return bHasCachedPhysicalDamageSpec;
+}
+
 void UMeleeTraceComponent::StopTrace()
 {
 	bIsTracing = false;
 	HitActors.Empty();
 	TraceSocketsLocalOffsets.Empty();
 	ActiveTraceSockets.Empty();
-	SetComponentTickEnabled(false); 
+	if (!IsHitstopActive())
+	{
+		SetComponentTickEnabled(false);
+	}
 }
 
 void UMeleeTraceComponent::SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec)
@@ -215,35 +529,7 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	// ======================== 1. 动态卡肉曲线处理 ========================
-	if (bIsHitstopping && CurrentHitstopData && CurrentHitstopData->HitstopCurve)
-	{
-		// 算一下从卡肉开始到现在，真实世界过去了多少秒
-		float ElapsedRealTime = World->GetRealTimeSeconds() - HitstopStartTime;
-
-		// 看看是不是该结束了
-		if (ElapsedRealTime >= CurrentHitstopData->HitstopDuration)
-		{
-			ResetHitStop();
-		}
-		else
-		{
-			// 计算当前卡肉进度 (0.0 代表刚开始，1.0 代表要结束了)
-			float Alpha = ElapsedRealTime / CurrentHitstopData->HitstopDuration;
-
-			// 【神来之笔】：去 DataAsset 的曲线图里，查一下这个进度对应的时间缩放率
-			float CurrentSpeedMultiplier = CurrentHitstopData->HitstopCurve->GetFloatValue(Alpha);
-
-			// 把这个“极慢”的速度，强行塞给主角和所有被打中的怪物
-			for (auto& WeakActor : HitstopAffectedActors)
-			{
-				if (AActor* Actor = WeakActor.Get())
-				{
-					Actor->CustomTimeDilation = DefaultTimeDilation * CurrentSpeedMultiplier;
-				}
-			}
-		}
-	}
+	UpdateHitstop(World->GetRealTimeSeconds());
 	// 此时 OwnerMeshComp 必定是有效的（在 StartTrace 里拦截过了）
 	if (!bIsTracing || !OwnerMeshComp || DeltaTime <= 0.0f) return;
 
@@ -311,19 +597,32 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 						HitActors.Add(HitActor);
 						OnMeleeHit.Broadcast(Hit);
 						SpawnHitVFX(Hit);
-						const bool bHasDamagePayload = bUsePhysicalDamageSpec
-							? (PhysicalDamageSpec.TrueRawAttack > 0.0f)
+						const bool bUseCachedPhysicalDamageSpec = HasCachedPhysicalDamageSpec();
+						const bool bHasDamagePayload = bUseCachedPhysicalDamageSpec
+							? true
 							: (BaseDamage > 0.0f);
 						if (bApplyDamageOnHit && bHasDamagePayload)
 						{
-							if (bUsePhysicalDamageSpec)
+							FMHWPhysicalDamageSpec RuntimeDamageSpec = bUseCachedPhysicalDamageSpec
+								? CachedPhysicalDamageSpec
+								: FMHWPhysicalDamageSpec();
+							if (!bUseCachedPhysicalDamageSpec)
 							{
-								UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(HitActor, GetOwner(), PhysicalDamageSpec);
+								RuntimeDamageSpec.TrueRawAttack = BaseDamage;
 							}
-							else
-							{
-								UMHWCombatBlueprintLibrary::ApplyRawDamageToActor(HitActor, BaseDamage);
-							}
+
+							UMHWPlayerCombatComponent* SourceCombatComponent = GetOwner()
+								? GetOwner()->FindComponentByClass<UMHWPlayerCombatComponent>()
+								: nullptr;
+							UMHWMonsterCombatComponent* TargetCombatComponent = HitActor
+								? HitActor->FindComponentByClass<UMHWMonsterCombatComponent>()
+								: nullptr;
+
+							FMHWPhysicalDamageSpec ResolvedDamageSpec = SourceCombatComponent
+								? SourceCombatComponent->BuildResolvedOutgoingPhysicalDamageSpec(RuntimeDamageSpec, TargetCombatComponent)
+								: RuntimeDamageSpec;
+
+							UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(HitActor, GetOwner(), ResolvedDamageSpec, true, Hit.ImpactPoint);
 						}
 						ApplyHitStop(HitActor);
 					}
@@ -333,4 +632,64 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	}
 
 	PreviousBaseTransform = CurrentBaseTransform;
+}
+
+void UMeleeTraceComponent::UpdateHitstop(float CurrentRealTimeSeconds)
+{
+	if (!IsHitstopActive() || !CurrentHitstopData)
+	{
+		return;
+	}
+
+	const float ElapsedRealTime = CurrentRealTimeSeconds - HitstopPhaseStartTime;
+
+	switch (HitstopPhase)
+	{
+	case EHitstopRuntimePhase::Freeze:
+		ApplyCurrentHitstopMultiplier(EvaluateCurrentTimeDilationMultiplier(0.0f));
+		UpdateOwnerMontagePlayRateForCurrentPhase(0.0f);
+
+		if (bOwnerMeshAnimationPausedByHitstop && ElapsedRealTime >= CurrentMeshFreezeDuration)
+		{
+			SetOwnerMeshAnimationPaused(false);
+		}
+
+		if (ElapsedRealTime >= HitstopPhaseDuration)
+		{
+			const float RecoverDuration = GetScaledHitstopDuration(CurrentHitstopData->MontageSlowDuration);
+			if (RecoverDuration > 0.0f)
+			{
+				BeginRecoverHitstop(RecoverDuration);
+			}
+			else
+			{
+				ResetHitStop();
+			}
+		}
+		break;
+
+	case EHitstopRuntimePhase::Recover:
+		if (HitstopPhaseDuration <= 0.0f)
+		{
+			ResetHitStop();
+			return;
+		}
+
+		if (ElapsedRealTime >= HitstopPhaseDuration)
+		{
+			ResetHitStop();
+			return;
+		}
+
+		{
+			const float PhaseAlpha = ElapsedRealTime / HitstopPhaseDuration;
+			ApplyCurrentHitstopMultiplier(EvaluateCurrentTimeDilationMultiplier(PhaseAlpha));
+			UpdateOwnerMontagePlayRateForCurrentPhase(PhaseAlpha);
+		}
+		break;
+
+	case EHitstopRuntimePhase::None:
+	default:
+		break;
+	}
 }

@@ -6,9 +6,14 @@
 #include "AbilitySystem/MHWDamageTypes.h"
 #include "Character/MHWMeleeHitVFXTypes.h"
 #include "Components/ActorComponent.h"
+#include "GameplayTagContainer.h"
 #include "MeleeTraceComponent.generated.h"
 class UMHWHitStopData;
 class UMHWEquipmentInstance;
+class UAnimInstance;
+class UAnimMontage;
+class USkeletalMeshComponent;
+struct FMHWAttackDataRow;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMeleeHitSignature, const FHitResult&, HitResult);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -39,12 +44,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
 	bool bApplyDamageOnHit = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
-	bool bUsePhysicalDamageSpec = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage", meta = (EditCondition = "bUsePhysicalDamageSpec"))
-	FMHWPhysicalDamageSpec PhysicalDamageSpec;
-
 	// 打中怪物时触发的事件，蓝图可以绑定它来播放特效或扣血
 	UPROPERTY(BlueprintAssignable, Category = "Hitbox Trace")
 	FOnMeleeHitSignature OnMeleeHit;
@@ -63,6 +62,22 @@ public:
 
 	bool ResolveTraceConfig(const FName& OverrideBaseSocket, const TArray<FName>& OverrideTraceSockets, FName& OutBaseSocket, TArray<FName>& OutTraceSockets);
 
+	const FMHWAttackDataRow* FindAttackDataRowBySpecTag(const FGameplayTag& AttackSpecTag);
+
+	const UMHWHitStopData* ResolveDefaultHitStopData(float MotionValue, bool bIsFinisher);
+
+	float CalculateHitStopStrengthMultiplier(float HitzoneValue, bool bIsSleepHit, bool bIsFinisher);
+
+	void SetHitStopConfig(const UMHWHitStopData* InHitStopData, float InStrengthMultiplier = 1.0f);
+
+	void ClearHitStopConfig();
+
+	void SetCachedPhysicalDamageSpec(const FMHWPhysicalDamageSpec& InDamageSpec);
+
+	void ClearCachedPhysicalDamageSpec();
+
+	bool HasCachedPhysicalDamageSpec() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace|VFX")
 	void SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec);
 
@@ -70,6 +85,12 @@ public:
 	void ClearHitVFXSpec();
 
 private:
+	enum class EHitstopRuntimePhase : uint8
+	{
+		None,
+		Freeze,
+		Recover
+	};
 
 	// 【新增】：动态获取并缓存武器 Mesh
 	USkeletalMeshComponent* GetWeaponMesh();
@@ -102,6 +123,18 @@ private:
 	
 	// 触发卡肉
 	void ApplyHitStop(AActor* HitActor);
+	void AddHitstopAffectedActor(AActor* Actor);
+	void ApplyCurrentHitstopMultiplier(float Multiplier);
+	bool InitializeOwnerMontageHitstop();
+	void SetOwnerMeshAnimationPaused(bool bPaused);
+	void UpdateOwnerMontagePlayRateForCurrentPhase(float PhaseAlpha = 0.0f) const;
+	float EvaluateCurrentTimeDilationMultiplier(float PhaseAlpha) const;
+	float EvaluateCurrentMontagePlayRate(float PhaseAlpha) const;
+	void BeginFreezeHitstop(float FreezeDuration);
+	void BeginRecoverHitstop(float RecoverDuration);
+	void UpdateHitstop(float CurrentRealTimeSeconds);
+	bool IsHitstopActive() const { return HitstopPhase != EHitstopRuntimePhase::None; }
+	float GetScaledHitstopDuration(float BaseDuration) const;
 	void SpawnHitVFX(const FHitResult& HitResult) const;
 	// 强制结束卡肉并清理状态
 	void ResetHitStop();
@@ -109,11 +142,15 @@ private:
 	// 当前缓存的卡肉数据指针 (从 Instance 获取)
 	const UMHWHitStopData* CurrentHitstopData;
 
-	// 是否正在卡肉中
-	bool bIsHitstopping = false;
-	
-	// 卡肉开始时的绝对真实世界时间 (秒)
-	float HitstopStartTime = 0.0f; 
+	float CurrentHitstopStrengthMultiplier = 1.0f;
+
+	EHitstopRuntimePhase HitstopPhase = EHitstopRuntimePhase::None;
+
+	// 当前卡肉阶段开始时的绝对真实世界时间 (秒)
+	float HitstopPhaseStartTime = 0.0f;
+
+	// 当前卡肉阶段时长（秒）
+	float HitstopPhaseDuration = 0.0f;
 
 	// 记录攻击者原本的时间膨胀倍率（通常是 1.0）
 	float DefaultTimeDilation = 1.0f;
@@ -121,6 +158,26 @@ private:
 	// 记录当前被卡肉减速影响的所有 Actor（攻击者自己 + 打中的怪物）
 	TArray<TWeakObjectPtr<AActor>> HitstopAffectedActors;
 
+	bool bHasOwnerMontageHitstop = false;
+
+	TWeakObjectPtr<UAnimInstance> CachedOwnerAnimInstance;
+
+	TWeakObjectPtr<UAnimMontage> CachedOwnerMontage;
+
+	TWeakObjectPtr<USkeletalMeshComponent> CachedOwnerSkeletalMesh;
+
+	float DefaultOwnerMontagePlayRate = 1.0f;
+
+	bool bOwnerMeshAnimationPausedByHitstop = false;
+
+	float CurrentMeshFreezeDuration = 0.0f;
+
 	UPROPERTY(Transient)
 	FMHWMeleeHitVFXSpec CurrentHitVFXSpec;
+
+	UPROPERTY(Transient)
+	FMHWPhysicalDamageSpec CachedPhysicalDamageSpec;
+
+	UPROPERTY(Transient)
+	bool bHasCachedPhysicalDamageSpec = false;
 };

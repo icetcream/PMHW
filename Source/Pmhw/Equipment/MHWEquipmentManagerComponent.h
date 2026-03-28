@@ -107,6 +107,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly)
 	void UnequipItem(UMHWEquipmentInstance* ItemInstance);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Equipment")
+	void EquipInitialEquipment();
 	
 
 	//~UActorComponent interface
@@ -115,6 +118,10 @@ public:
 	virtual void InitializeComponent() override;
 	virtual void UninitializeComponent() override;
 	//~End of UActorComponent interface
+
+	//~UMHWPawnComponent interface
+	virtual void OnActorInitStateChanged(FGameplayTag CurrentState) override;
+	//~End of UMHWPawnComponent interface
 
 	/** Returns the first equipped instance of a given type, or nullptr if none are found */
 	UFUNCTION(BlueprintCallable, BlueprintPure)
@@ -133,6 +140,12 @@ public:
 	}
 
 private:
+	UPROPERTY(EditDefaultsOnly, Category = "Equipment")
+	TArray<TSubclassOf<UMHWEquipmentDefinition>> InitialEquipmentDefinitions;
+
+	UPROPERTY(Transient)
+	bool bInitialEquipmentEquipped = false;
+
 	UPROPERTY()
 	FMHWEquipmentList EquipmentList;
 };

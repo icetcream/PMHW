@@ -12,6 +12,7 @@
 #include "Animation/MHWAnimInstance.h"
 #include "Character/MHWAttackComponent.h"
 #include "Character/MHWCombatComponent.h"
+#include "Character/MHWPlayerCombatComponent.h"
 #include "Character/MHWPawnExtensionComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "Equipment/MHWEquipmentManagerComponent.h"
@@ -36,7 +37,7 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	MHWComboPreInputComponent = CreateDefaultSubobject<UMHWComboPreInputComponent>(TEXT("MHWComboPreInputComponent"));
 	MHWMeleeTraceComponent = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MHWMeleeTraceComponent"));
 	MHWAttackComponent = CreateDefaultSubobject<UMHWAttackComponent>(TEXT("MHWAttackComponent"));
-	MHWCombatComponent = CreateDefaultSubobject<UMHWCombatComponent>(TEXT("MHWCombatComponent"));
+	MHWCombatComponent = CreateDefaultSubobject<UMHWPlayerCombatComponent>(TEXT("MHWCombatComponent"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;

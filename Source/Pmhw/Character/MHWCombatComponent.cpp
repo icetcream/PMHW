@@ -2,9 +2,12 @@
 
 #include "AbilitySystem/Attributes/MHWCombatAttributeSet.h"
 #include "AbilitySystem/MHWDamageGameplayEffect.h"
+#include "AbilitySystem/MHWGameplayEffectContext.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
+#include "GameplayEffect.h"
 #include "MHWGameplayTags.h"
+#include "UI/MHWDamageNumberActor.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatComponent)
 
@@ -169,7 +172,7 @@ bool UMHWCombatComponent::ApplyRawDamage(float DamageAmount)
 	return ApplyPhysicalDamage(nullptr, DamageSpec);
 }
 
-bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec)
+bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation)
 {
 	if (DamageSpec.TrueRawAttack <= 0.0f)
 	{
@@ -193,6 +196,17 @@ bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhy
 		EffectContext.AddSourceObject(SourceActor);
 	}
 
+	if (bHasDamageNumberWorldLocation)
+	{
+		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
+		{
+			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
+			{
+				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
+			}
+		}
+	}
+
 	FGameplayEffectSpecHandle SpecHandle = SpecSourceASC->MakeOutgoingSpec(UMHWDamageGameplayEffect::StaticClass(), 1.0f, EffectContext);
 	if (!SpecHandle.IsValid())
 	{
@@ -209,7 +223,7 @@ bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhy
 	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, DamageSpec.MotionValue);
 	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, DamageSpec.MotionValueScale);
 	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, DamageSpec.SharpnessMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::AffinityChance, DamageSpec.AffinityChance);
+	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, DamageSpec.CriticalChance);
 	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, DamageSpec.PositiveCriticalMultiplier);
 	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, DamageSpec.NegativeCriticalMultiplier);
 	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, DamageSpec.CriticalMultiplierOverride);
@@ -230,6 +244,72 @@ void UMHWCombatComponent::ResetVitalsToMax()
 	RestoreStamina(GetMaxStamina() - GetStamina());
 }
 
+bool UMHWCombatComponent::ApplyInitialAttributesEffect(bool bForceReapply)
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC || !InitialAttributesEffectClass)
+	{
+		return false;
+	}
+
+	if (!bForceReapply && bInitialAttributesEffectApplied && InitialAttributesAppliedASC == ASC)
+	{
+		return false;
+	}
+
+	const UGameplayEffect* InitialEffect = InitialAttributesEffectClass->GetDefaultObject<UGameplayEffect>();
+	if (!InitialEffect)
+	{
+		return false;
+	}
+
+	FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+	EffectContext.AddSourceObject(GetOwner());
+	ASC->ApplyGameplayEffectToSelf(InitialEffect, InitialAttributesEffectLevel, EffectContext);
+
+	bInitialAttributesEffectApplied = true;
+	InitialAttributesAppliedASC = ASC;
+	return true;
+}
+
+void UMHWCombatComponent::ResetInitialAttributesEffectApplication()
+{
+	bInitialAttributesEffectApplied = false;
+	InitialAttributesAppliedASC = nullptr;
+}
+
+void UMHWCombatComponent::NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation)
+{
+	OnDamagedDetailed.Broadcast(SourceActor, GetOwner(), DamageAmount, NewHealth);
+	OnDamagedResultDetailed.Broadcast(SourceActor, GetOwner(), DamageAmount, NewHealth, CriticalHitType);
+	SpawnDamageNumberActor(DamageAmount, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+}
+
+void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation) const
+{
+	if (!bSpawnDamageNumberOnDamage || !DamageNumberActorClass)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	UWorld* World = GetWorld();
+	if (!OwnerActor || !World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = OwnerActor;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	const FVector SpawnLocation = bHasDamageNumberWorldLocation ? DamageNumberWorldLocation : OwnerActor->GetActorLocation();
+	if (AMHWDamageNumberActor* DamageNumberActor = World->SpawnActor<AMHWDamageNumberActor>(DamageNumberActorClass, SpawnLocation, FRotator::ZeroRotator, SpawnParameters))
+	{
+		DamageNumberActor->InitializeDamageNumber(OwnerActor, DamageAmount, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+	}
+}
+
 bool UMHWCombatComponent::TryInitializeFromOwner()
 {
 	if (bAttributeDelegatesBound)
@@ -247,6 +327,11 @@ bool UMHWCombatComponent::TryInitializeFromOwner()
 	if (!Attributes)
 	{
 		return false;
+	}
+
+	if (bApplyInitialAttributesEffectOnInitialize)
+	{
+		ApplyInitialAttributesEffect();
 	}
 
 	CachedAbilitySystemComponent = ASC;

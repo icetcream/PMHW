@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "Character/MHWMonsterCombatComponent.h"
 #include "GameFramework/Pawn.h"
 #include "MHWCombatPawn.generated.h"
 
@@ -40,7 +41,7 @@ public:
 	const UMHWCombatAttributeSet* GetCombatAttributeSet() const { return CombatAttributeSet; }
 
 	UFUNCTION(BlueprintPure, Category = "MHW|Combatant|Attributes")
-	UMHWCombatComponent* GetCombatComponent() const { return CombatComponent; }
+	UMHWCombatComponent* GetCombatComponent() const { return CombatComponent.Get(); }
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Combatant", meta = (AllowPrivateAccess = "true"))
@@ -53,5 +54,5 @@ private:
 	TObjectPtr<UMHWCombatAttributeSet> CombatAttributeSet;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Combatant", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UMHWCombatComponent> CombatComponent;
+	TObjectPtr<UMHWMonsterCombatComponent> CombatComponent;
 };

@@ -6,11 +6,15 @@
 #include "MHWCombatComponent.generated.h"
 
 class UAbilitySystemComponent;
+class UGameplayEffect;
 class UMHWCombatAttributeSet;
+class AMHWDamageNumberActor;
 struct FOnAttributeChangeData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FMHWAttributeChangedSignature, float, NewValue, float, MaxValue, float, DeltaValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMHWDamageSignature, float, DamageAmount, float, NewHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FMHWDamageDetailedSignature, AActor*, SourceActor, AActor*, TargetActor, float, DamageAmount, float, NewHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FMHWDamageResultDetailedSignature, AActor*, SourceActor, AActor*, TargetActor, float, DamageAmount, float, NewHealth, EMHWCriticalHitType, CriticalHitType);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMHWDeathSignature);
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -64,10 +68,16 @@ public:
 	bool ApplyRawDamage(float DamageAmount);
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
-	bool ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec);
+	bool ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation = false, FVector DamageNumberWorldLocation = FVector::ZeroVector);
 
 	UFUNCTION(BlueprintCallable, Category = "MHW|Combat")
 	void ResetVitalsToMax();
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat|Init")
+	bool ApplyInitialAttributesEffect(bool bForceReapply = false);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Combat|Init")
+	void ResetInitialAttributesEffectApplication();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Stamina")
 	bool bEnableStaminaAutoRegen = true;
@@ -77,6 +87,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Stamina", meta = (ClampMin = "0.0"))
 	float StaminaRegenDelay = 1.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Init")
+	bool bApplyInitialAttributesEffectOnInitialize = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Init")
+	TSubclassOf<UGameplayEffect> InitialAttributesEffectClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Init", meta = (ClampMin = "0.0"))
+	float InitialAttributesEffectLevel = 1.0f;
 
 	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
 	FMHWAttributeChangedSignature OnHealthChanged;
@@ -88,9 +107,24 @@ public:
 	FMHWDamageSignature OnDamaged;
 
 	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
+	FMHWDamageDetailedSignature OnDamagedDetailed;
+
+	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
+	FMHWDamageResultDetailedSignature OnDamagedResultDetailed;
+
+	UPROPERTY(BlueprintAssignable, Category = "MHW|Combat|Events")
 	FMHWDeathSignature OnDeath;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Damage Number")
+	bool bSpawnDamageNumberOnDamage = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Damage Number", meta = (EditCondition = "bSpawnDamageNumberOnDamage"))
+	TSubclassOf<AMHWDamageNumberActor> DamageNumberActorClass;
+
+	void NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation);
+
 private:
+	void SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation) const;
 	bool TryInitializeFromOwner();
 	void HandleAutomaticStaminaRegen(float DeltaSeconds);
 	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
@@ -101,7 +135,13 @@ private:
 	TObjectPtr<UAbilitySystemComponent> CachedAbilitySystemComponent;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UAbilitySystemComponent> InitialAttributesAppliedASC;
+
+	UPROPERTY(Transient)
 	bool bAttributeDelegatesBound = false;
+
+	UPROPERTY(Transient)
+	bool bInitialAttributesEffectApplied = false;
 
 	UPROPERTY(Transient)
 	float LastHealthValue = 0.0f;

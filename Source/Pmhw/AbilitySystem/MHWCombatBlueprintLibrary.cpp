@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilitySystem/MHWDamageGameplayEffect.h"
+#include "AbilitySystem/MHWGameplayEffectContext.h"
 #include "Character/MHWCombatComponent.h"
 #include "MHWGameplayTags.h"
 
@@ -12,10 +13,10 @@ bool UMHWCombatBlueprintLibrary::ApplyRawDamageToActor(AActor* TargetActor, floa
 {
 	FMHWPhysicalDamageSpec DamageSpec;
 	DamageSpec.TrueRawAttack = DamageAmount;
-	return ApplyPhysicalDamageToActor(TargetActor, nullptr, DamageSpec);
+	return ApplyPhysicalDamageToActor(TargetActor, nullptr, DamageSpec, false, FVector::ZeroVector);
 }
 
-bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor, AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec)
+bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor, AActor* SourceActor, const FMHWPhysicalDamageSpec& DamageSpec, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation)
 {
 	if (!IsValid(TargetActor) || DamageSpec.TrueRawAttack <= 0.0f)
 	{
@@ -24,7 +25,7 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 
 	if (UMHWCombatComponent* CombatComponent = TargetActor->FindComponentByClass<UMHWCombatComponent>())
 	{
-		return CombatComponent->ApplyPhysicalDamage(SourceActor, DamageSpec);
+		return CombatComponent->ApplyPhysicalDamage(SourceActor, DamageSpec, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
 	}
 
 	UAbilitySystemComponent* TargetASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(TargetActor);
@@ -44,6 +45,17 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 		EffectContext.AddSourceObject(SourceActor);
 	}
 
+	if (bHasDamageNumberWorldLocation)
+	{
+		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
+		{
+			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
+			{
+				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
+			}
+		}
+	}
+
 	FGameplayEffectSpecHandle SpecHandle = SpecSourceASC->MakeOutgoingSpec(UMHWDamageGameplayEffect::StaticClass(), 1.0f, EffectContext);
 	if (!SpecHandle.IsValid())
 	{
@@ -60,7 +72,7 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, DamageSpec.MotionValue);
 	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, DamageSpec.MotionValueScale);
 	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, DamageSpec.SharpnessMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::AffinityChance, DamageSpec.AffinityChance);
+	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, DamageSpec.CriticalChance);
 	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, DamageSpec.PositiveCriticalMultiplier);
 	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, DamageSpec.NegativeCriticalMultiplier);
 	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, DamageSpec.CriticalMultiplierOverride);

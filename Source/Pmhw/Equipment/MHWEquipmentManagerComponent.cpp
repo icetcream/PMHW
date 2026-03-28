@@ -199,6 +199,24 @@ void UMHWEquipmentManagerComponent::UnequipItem(UMHWEquipmentInstance* ItemInsta
 	}
 }
 
+void UMHWEquipmentManagerComponent::EquipInitialEquipment()
+{
+	if (bInitialEquipmentEquipped || !GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	for (const TSubclassOf<UMHWEquipmentDefinition> EquipmentDefinition : InitialEquipmentDefinitions)
+	{
+		if (EquipmentDefinition)
+		{
+			EquipItem(EquipmentDefinition);
+		}
+	}
+
+	bInitialEquipmentEquipped = true;
+}
+
 void UMHWEquipmentManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -226,6 +244,16 @@ void UMHWEquipmentManagerComponent::UninitializeComponent()
 	}
 
 	Super::UninitializeComponent();
+}
+
+void UMHWEquipmentManagerComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
+{
+	Super::OnActorInitStateChanged(CurrentState);
+
+	if (CurrentState == MHWInitStateTags::GameplayReady)
+	{
+		EquipInitialEquipment();
+	}
 }
 
 

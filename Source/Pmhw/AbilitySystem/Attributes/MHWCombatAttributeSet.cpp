@@ -1,5 +1,7 @@
 #include "AbilitySystem/Attributes/MHWCombatAttributeSet.h"
 
+#include "AbilitySystem/MHWGameplayEffectContext.h"
+#include "Character/MHWCombatComponent.h"
 #include "GameplayEffectExtension.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatAttributeSet)
@@ -47,6 +49,48 @@ void UMHWCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModC
 		{
 			const float NewHealth = FMath::Clamp(GetHealth() - LocalIncomingDamage, 0.0f, GetMaxHealth());
 			SetHealth(NewHealth);
+
+			AActor* SourceActor = nullptr;
+			EMHWCriticalHitType CriticalHitType = EMHWCriticalHitType::None;
+			bool bHasDamageNumberWorldLocation = false;
+			FVector DamageNumberWorldLocation = FVector::ZeroVector;
+			const FGameplayEffectContextHandle& EffectContext = Data.EffectSpec.GetEffectContext();
+			if (UObject* SourceObject = EffectContext.GetSourceObject())
+			{
+				SourceActor = Cast<AActor>(SourceObject);
+			}
+
+			if (const FGameplayEffectContext* RawEffectContext = EffectContext.Get())
+			{
+				if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
+				{
+					const FMHWGameplayEffectContext* MHWEffectContext = static_cast<const FMHWGameplayEffectContext*>(RawEffectContext);
+					CriticalHitType = MHWEffectContext->GetCriticalHitType();
+					bHasDamageNumberWorldLocation = MHWEffectContext->HasDamageNumberWorldLocation();
+					if (bHasDamageNumberWorldLocation)
+					{
+						DamageNumberWorldLocation = MHWEffectContext->GetDamageNumberWorldLocation();
+					}
+				}
+			}
+
+			if (!SourceActor)
+			{
+				SourceActor = EffectContext.GetEffectCauser();
+			}
+
+			if (!SourceActor)
+			{
+				SourceActor = EffectContext.GetOriginalInstigator();
+			}
+
+			if (AActor* OwningActor = GetOwningActor())
+			{
+				if (UMHWCombatComponent* CombatComponent = OwningActor->FindComponentByClass<UMHWCombatComponent>())
+				{
+					CombatComponent->NotifyDamageReceived(LocalIncomingDamage, NewHealth, SourceActor, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
+				}
+			}
 		}
 		return;
 	}

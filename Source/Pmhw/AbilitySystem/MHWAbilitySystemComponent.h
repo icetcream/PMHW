@@ -15,6 +15,8 @@ class PMHW_API UMHWAbilitySystemComponent : public UAbilitySystemComponent
 public:
 	// Sets default values for this component's properties
 	UMHWAbilitySystemComponent();
+
+	virtual FGameplayEffectContextHandle MakeEffectContext() const override;
 	
 	void ClearAbilityInput();
 	

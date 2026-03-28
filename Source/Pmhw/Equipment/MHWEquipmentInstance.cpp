@@ -4,9 +4,13 @@
 #include "Equipment/MHWEquipmentInstance.h"
 
 #include "EnhancedInputSubsystems.h"
+#include "Character/MHWPlayerCombatComponent.h"
+#include "Data/InputActionMappingAsset.h"
+#include "Data/MHWAttackDataTable.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "GameFramework/Character.h"
 #include "Player/MHWLocalPlayer.h"
+#include "Subsystems/ConfigManager.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentInstance)
 
@@ -16,7 +20,6 @@ class USceneComponent;
 UMHWEquipmentInstance::UMHWEquipmentInstance(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-
 }
 
 void UMHWEquipmentInstance::SetEquipmentDefinition(TSubclassOf<UMHWEquipmentDefinition> InDef)
@@ -30,13 +33,9 @@ UWorld* UMHWEquipmentInstance::GetWorld() const
 	{
 		return OwningPawn->GetWorld();
 	}
-	else
-	{
-		return nullptr;
-	}
+
+	return nullptr;
 }
-
-
 
 APawn* UMHWEquipmentInstance::GetPawn() const
 {
@@ -53,6 +52,7 @@ APawn* UMHWEquipmentInstance::GetTypedPawn(TSubclassOf<APawn> PawnType) const
 			Result = Cast<APawn>(GetOuter());
 		}
 	}
+
 	return Result;
 }
 
@@ -60,12 +60,9 @@ void UMHWEquipmentInstance::UpdateAttachment(FName NewSocketName)
 {
 	if (SpawnedActor)
 	{
-		// 获取 Character 的 Mesh
 		if (ACharacter* MyCharacter = Cast<ACharacter>(GetPawn()))
 		{
 			USkeletalMeshComponent* AttachTarget = MyCharacter->GetMesh();
-			// 执行 Attach
-			FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
 			SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, NewSocketName);
 		}
 	}
@@ -73,18 +70,107 @@ void UMHWEquipmentInstance::UpdateAttachment(FName NewSocketName)
 
 const UMHWHitStopData* UMHWEquipmentInstance::GetHitStopData() const
 {
-	// 如果之前成功绑定了 Definition
-	if (EquipmentDef != nullptr)
+	if (const UMHWEquipmentDefinition* DefCDO = GetEquipmentDefinition())
 	{
-		// 通过 GetDefault 获取该类的静态配置实例 (CDO)
-		const UMHWEquipmentDefinition* DefCDO = GetDefault<UMHWEquipmentDefinition>(EquipmentDef);
-		if (DefCDO)
+		return DefCDO->HitStopData;
+	}
+
+	return nullptr;
+}
+
+const UMHWHitStopData* UMHWEquipmentInstance::ResolveHitStopDataForMotionValue(float MotionValue, bool bIsFinisher) const
+{
+	const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition();
+	if (!EquipmentDefinition)
+	{
+		return nullptr;
+	}
+
+	const FMHWHitStopTierConfig& TierConfig = EquipmentDefinition->HitStopTierConfig;
+
+	if (bIsFinisher && TierConfig.FinisherHitStopData)
+	{
+		return TierConfig.FinisherHitStopData;
+	}
+
+	if (MotionValue >= TierConfig.HeavyMotionValueThreshold && TierConfig.HeavyHitStopData)
+	{
+		return TierConfig.HeavyHitStopData;
+	}
+
+	if (MotionValue >= TierConfig.MediumMotionValueThreshold && TierConfig.MediumHitStopData)
+	{
+		return TierConfig.MediumHitStopData;
+	}
+
+	if (TierConfig.LightHitStopData)
+	{
+		return TierConfig.LightHitStopData;
+	}
+
+	return EquipmentDefinition->HitStopData;
+}
+
+float UMHWEquipmentInstance::CalculateHitStopStrengthMultiplier(float HitzoneValue, bool bIsSleepHit, bool bIsFinisher) const
+{
+	const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition();
+	if (!EquipmentDefinition)
+	{
+		return 1.0f;
+	}
+
+	const FMHWHitStopTierConfig& TierConfig = EquipmentDefinition->HitStopTierConfig;
+	float Multiplier = TierConfig.MidHitzoneMultiplier;
+
+	if (HitzoneValue > 0.0f)
+	{
+		if (HitzoneValue < TierConfig.LowHitzoneThreshold)
 		{
-			// 返回策划在蓝图里配好的卡肉数据资产！
-			return DefCDO->HitStopData;
+			Multiplier *= TierConfig.LowHitzoneMultiplier;
+		}
+		else if (HitzoneValue >= TierConfig.HighHitzoneThreshold)
+		{
+			Multiplier *= TierConfig.HighHitzoneMultiplier;
 		}
 	}
-	// 如果没配，或者发生了异常，返回空
+
+	if (bIsSleepHit)
+	{
+		Multiplier *= TierConfig.SleepMultiplier;
+	}
+
+	if (bIsFinisher)
+	{
+		Multiplier *= TierConfig.FinisherMultiplier;
+	}
+
+	return FMath::Max(0.0f, Multiplier);
+}
+
+const FMHWAttackDataRow* UMHWEquipmentInstance::FindAttackDataRowBySpecTag(const FGameplayTag& AttackSpecTag) const
+{
+	if (!AttackSpecTag.IsValid())
+	{
+		return nullptr;
+	}
+
+	const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition();
+	if (!EquipmentDefinition || !EquipmentDefinition->AttackDataTable)
+	{
+		return nullptr;
+	}
+
+	static const FString ContextString = TEXT("MHWAttackDataLookup");
+	TArray<FMHWAttackDataRow*> AllRows;
+	EquipmentDefinition->AttackDataTable->GetAllRows<FMHWAttackDataRow>(ContextString, AllRows);
+	for (const FMHWAttackDataRow* Row : AllRows)
+	{
+		if (Row && Row->AttackSpecTag == AttackSpecTag)
+		{
+			return Row;
+		}
+	}
+
 	return nullptr;
 }
 
@@ -103,8 +189,6 @@ const FMHWMeleeTraceConfig* UMHWEquipmentInstance::GetDefaultMeleeTraceConfig() 
 	return nullptr;
 }
 
-
-
 void UMHWEquipmentInstance::SpawnEquipmentActors(const TArray<FMHWEquipmentActorToSpawn>& ActorsToSpawn)
 {
 	if (APawn* OwningPawn = GetPawn())
@@ -118,29 +202,122 @@ void UMHWEquipmentInstance::SpawnEquipmentActors(const TArray<FMHWEquipmentActor
 		for (const FMHWEquipmentActorToSpawn& SpawnInfo : ActorsToSpawn)
 		{
 			SpawnedActor = GetWorld()->SpawnActorDeferred<AActor>(SpawnInfo.ActorToSpawn, FTransform::Identity, OwningPawn);
-			SpawnedActor->FinishSpawning(FTransform::Identity, /*bIsDefaultTransform=*/ true);
+			SpawnedActor->FinishSpawning(FTransform::Identity, true);
 			SpawnedActor->SetActorRelativeTransform(SpawnInfo.AttachTransform);
 			SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, SpawnInfo.AttachSocket);
-			
 		}
 	}
 }
 
 void UMHWEquipmentInstance::DestroyEquipmentActors()
 {
-		if (SpawnedActor)
-		{
-			SpawnedActor->Destroy();
-		}
+	if (SpawnedActor)
+	{
+		SpawnedActor->Destroy();
+	}
 }
 
 void UMHWEquipmentInstance::OnEquipped()
 {
+	if (!bAppliedPlayerAttackPanelBonus)
+	{
+		if (const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition())
+		{
+			if (EquipmentDefinition->PlayerAttackPanelBonus.HasAnyBonus())
+			{
+				if (APawn* OwningPawn = GetPawn())
+				{
+					if (UMHWPlayerCombatComponent* PlayerCombatComponent = OwningPawn->FindComponentByClass<UMHWPlayerCombatComponent>())
+					{
+						PlayerCombatComponent->ApplyAttackPanelBonus(EquipmentDefinition->PlayerAttackPanelBonus);
+						bAppliedPlayerAttackPanelBonus = true;
+					}
+				}
+			}
+		}
+	}
+
+	if (const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition())
+	{
+		if (EquipmentDefinition->InputActionMappingAsset)
+		{
+			if (UWorld* World = GetWorld())
+			{
+				if (UGameInstance* GameInstance = World->GetGameInstance())
+				{
+					if (UConfigManager* ConfigManager = GameInstance->GetSubsystem<UConfigManager>())
+					{
+						ConfigManager->SetInputActionMappingAsset(EquipmentDefinition->InputActionMappingAsset);
+					}
+				}
+			}
+		}
+
+		if (EquipmentDefinition->LinkedAnimLayerClass)
+		{
+			if (ACharacter* Character = Cast<ACharacter>(GetPawn()))
+			{
+				if (USkeletalMeshComponent* Mesh = Character->GetMesh())
+				{
+					Mesh->LinkAnimClassLayers(EquipmentDefinition->LinkedAnimLayerClass);
+				}
+			}
+		}
+	}
+
 	K2_OnEquipped();
 }
 
 void UMHWEquipmentInstance::OnUnequipped()
 {
+	const UMHWEquipmentDefinition* EquipmentDefinition = GetEquipmentDefinition();
+
+	if (bAppliedPlayerAttackPanelBonus)
+	{
+		if (EquipmentDefinition)
+		{
+			if (APawn* OwningPawn = GetPawn())
+			{
+				if (UMHWPlayerCombatComponent* PlayerCombatComponent = OwningPawn->FindComponentByClass<UMHWPlayerCombatComponent>())
+				{
+					PlayerCombatComponent->RemoveAttackPanelBonus(EquipmentDefinition->PlayerAttackPanelBonus);
+				}
+			}
+		}
+
+		bAppliedPlayerAttackPanelBonus = false;
+	}
+
+	if (EquipmentDefinition)
+	{
+		if (EquipmentDefinition->LinkedAnimLayerClass)
+		{
+			if (ACharacter* Character = Cast<ACharacter>(GetPawn()))
+			{
+				if (USkeletalMeshComponent* Mesh = Character->GetMesh())
+				{
+					Mesh->UnlinkAnimClassLayers(EquipmentDefinition->LinkedAnimLayerClass);
+				}
+			}
+		}
+
+		if (EquipmentDefinition->InputActionMappingAsset)
+		{
+			if (UWorld* World = GetWorld())
+			{
+				if (UGameInstance* GameInstance = World->GetGameInstance())
+				{
+					if (UConfigManager* ConfigManager = GameInstance->GetSubsystem<UConfigManager>())
+					{
+						if (ConfigManager->InputActionMappingAsset == EquipmentDefinition->InputActionMappingAsset)
+						{
+							ConfigManager->SetInputActionMappingAsset(nullptr);
+						}
+					}
+				}
+			}
+		}
+	}
+
 	K2_OnUnequipped();
 }
-

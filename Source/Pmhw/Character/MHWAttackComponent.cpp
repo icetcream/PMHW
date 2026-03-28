@@ -1,6 +1,7 @@
 #include "Character/MHWAttackComponent.h"
 
 #include "Character/MeleeTraceComponent.h"
+#include "Data/MHWAttackDataTable.h"
 #include "GameFramework/Actor.h"
 #include "Interface/MHWCharacterInterface.h"
 
@@ -72,9 +73,11 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 		return false;
 	}
 
-	CachedMeleeTraceComponent->bUsePhysicalDamageSpec = true;
-	CachedMeleeTraceComponent->PhysicalDamageSpec = BuildDamageSpecForWindow(WindowSpec);
+	const FMHWPhysicalDamageSpec ResolvedDamageSpec = BuildDamageSpecForWindow(WindowSpec);
+
+	CachedMeleeTraceComponent->SetCachedPhysicalDamageSpec(ResolvedDamageSpec);
 	CachedMeleeTraceComponent->SetHitVFXSpec(WindowSpec.HitVFX);
+	ConfigureHitstopForWindow(WindowSpec, ResolvedDamageSpec);
 	CachedMeleeTraceComponent->StartTrace(ResolvedBaseSocket, ResolvedTraceSockets);
 	return true;
 }
@@ -150,17 +153,24 @@ void UMHWAttackComponent::StopTraceAndClearDamageSpec()
 	}
 
 	CachedMeleeTraceComponent->StopTrace();
-	CachedMeleeTraceComponent->bUsePhysicalDamageSpec = false;
+	CachedMeleeTraceComponent->ClearCachedPhysicalDamageSpec();
 	CachedMeleeTraceComponent->ClearHitVFXSpec();
-
-	FMHWPhysicalDamageSpec ClearedDamageSpec;
-	ClearedDamageSpec.TrueRawAttack = 0.0f;
-	CachedMeleeTraceComponent->PhysicalDamageSpec = ClearedDamageSpec;
+	CachedMeleeTraceComponent->ClearHitStopConfig();
 }
 
 FMHWPhysicalDamageSpec UMHWAttackComponent::BuildDamageSpecForWindow(const FMHWAttackWindowSpec& WindowSpec) const
 {
-	FMHWPhysicalDamageSpec ResolvedDamageSpec = WindowSpec.BaseDamageSpec;
+	FMHWPhysicalDamageSpec ResolvedDamageSpec;
+	ResolvedDamageSpec.TrueRawAttack = 0.0f;
+	ResolvedDamageSpec.MotionValue = 0.0f;
+
+	if (CachedMeleeTraceComponent && WindowSpec.AttackSpecTag.IsValid())
+	{
+		if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(WindowSpec.AttackSpecTag))
+		{
+			ResolvedDamageSpec.MotionValue = AttackDataRow->MotionValue;
+		}
+	}
 
 	if (WindowSpec.bBonusIfPreviousWindowHit)
 	{
@@ -172,6 +182,32 @@ FMHWPhysicalDamageSpec UMHWAttackComponent::BuildDamageSpecForWindow(const FMHWA
 	}
 
 	return ResolvedDamageSpec;
+}
+
+void UMHWAttackComponent::ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FMHWPhysicalDamageSpec& ResolvedDamageSpec)
+{
+	if (!CachedMeleeTraceComponent)
+	{
+		return;
+	}
+
+	if (!WindowSpec.AttackSpecTag.IsValid())
+	{
+		CachedMeleeTraceComponent->ClearHitStopConfig();
+		return;
+	}
+
+	const UMHWHitStopData* HitStopData = WindowSpec.HitStopDataOverride
+		? WindowSpec.HitStopDataOverride.Get()
+		: CachedMeleeTraceComponent->ResolveDefaultHitStopData(ResolvedDamageSpec.MotionValue, WindowSpec.bIsFinisher);
+
+	const bool bIsSleepHit = ResolvedDamageSpec.AilmentMultiplier > 1.0f + KINDA_SMALL_NUMBER;
+	const float HitStopStrengthMultiplier = CachedMeleeTraceComponent->CalculateHitStopStrengthMultiplier(
+		ResolvedDamageSpec.HitzoneValue,
+		bIsSleepHit,
+		WindowSpec.bIsFinisher);
+
+	CachedMeleeTraceComponent->SetHitStopConfig(HitStopData, HitStopStrengthMultiplier);
 }
 
 int32 UMHWAttackComponent::ResolveBonusCheckWindowIndex(const FMHWAttackWindowSpec& WindowSpec) const

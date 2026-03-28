@@ -91,7 +91,7 @@ namespace MHWDamageDataTags
 	UE_DEFINE_GAMEPLAY_TAG(MotionValue, "Data.Damage.MotionValue");
 	UE_DEFINE_GAMEPLAY_TAG(MotionValueScale, "Data.Damage.MotionValueScale");
 	UE_DEFINE_GAMEPLAY_TAG(SharpnessMultiplier, "Data.Damage.SharpnessMultiplier");
-	UE_DEFINE_GAMEPLAY_TAG(AffinityChance, "Data.Damage.AffinityChance");
+	UE_DEFINE_GAMEPLAY_TAG(CriticalChance, "Data.Damage.CriticalChance");
 	UE_DEFINE_GAMEPLAY_TAG(PositiveCriticalMultiplier, "Data.Damage.PositiveCriticalMultiplier");
 	UE_DEFINE_GAMEPLAY_TAG(NegativeCriticalMultiplier, "Data.Damage.NegativeCriticalMultiplier");
 	UE_DEFINE_GAMEPLAY_TAG(CriticalMultiplierOverride, "Data.Damage.CriticalMultiplierOverride");

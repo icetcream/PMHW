@@ -3,13 +3,21 @@
 #include "CoreMinimal.h"
 #include "MHWDamageTypes.generated.h"
 
+UENUM(BlueprintType)
+enum class EMHWCriticalHitType : uint8
+{
+	None UMETA(DisplayName = "普通命中"),
+	Positive UMETA(DisplayName = "会心"),
+	Negative UMETA(DisplayName = "负会心")
+};
+
 USTRUCT(BlueprintType, meta = (DisplayName = "物理伤害参数"))
 struct PMHW_API FMHWPhysicalDamageSpec
 {
 	GENERATED_BODY()
 
 	// True raw only. Convert displayed attack with the weapon coefficient before filling this.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Damage", meta = (DisplayName = "人物攻击力"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Damage", meta = (DisplayName = "人物攻击力", ClampMin = "0.0"))
 	float TrueRawAttack = 10.0f;
 
 	// Motion value in MH style, e.g. 48 means 48%.
@@ -25,7 +33,7 @@ struct PMHW_API FMHWPhysicalDamageSpec
 
 	// Affinity in MH style. Positive rolls positive crit, negative rolls weak hits.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Damage", meta = (DisplayName = "会心率", ClampMin = "-100.0", ClampMax = "100.0"))
-	float AffinityChance = 0.0f;
+	float CriticalChance = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Damage", meta = (DisplayName = "正会心补正", ClampMin = "0.0"))
 	float PositiveCriticalMultiplier = 1.25f;

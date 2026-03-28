@@ -6,6 +6,8 @@
 #include "Animation/AnimMontage.h"
 #include "Character/MHWCharacter.h"
 #include "Character/MHWComboPreInputComponent.h"
+#include "Character/MeleeTraceComponent.h"
+#include "Data/MHWAttackDataTable.h"
 #include "Interface/MHWCharacterInterface.h"
 #include "MotionWarpingComponent.h"
 #include "StateTreeExecutionContext.h"
@@ -192,6 +194,55 @@ namespace ComboMontagePlayTask
 		InstanceData.bInterruptedCleanupDone = false;
 		InstanceData.bAppliedMotionWarping = false;
 	}
+
+	static bool TryConsumeConfiguredStamina(AMHWCharacter* Character, const FGameplayTag& AttackSpecTag)
+	{
+		if (!Character || !AttackSpecTag.IsValid())
+		{
+			return true;
+		}
+
+		if (!Character->Implements<UMHWCharacterInterface>())
+		{
+			UE_LOG(LogStateTree, Warning, TEXT("ComboMontagePlay failed to consume stamina: %s does not implement MHWCharacterInterface."),
+				*GetNameSafe(Character));
+			return true;
+		}
+
+		UMeleeTraceComponent* MeleeTraceComponent = IMHWCharacterInterface::Execute_GetMeleeTraceComponent(Character);
+		if (!MeleeTraceComponent)
+		{
+			UE_LOG(LogStateTree, Verbose, TEXT("ComboMontagePlay skipped stamina consume: %s has no MeleeTraceComponent for AttackSpecTag [%s]."),
+				*GetNameSafe(Character),
+				*AttackSpecTag.ToString());
+			return true;
+		}
+
+		const FMHWAttackDataRow* AttackDataRow = MeleeTraceComponent->FindAttackDataRowBySpecTag(AttackSpecTag);
+		if (!AttackDataRow)
+		{
+			UE_LOG(LogStateTree, Verbose, TEXT("ComboMontagePlay skipped stamina consume: attack data row not found for AttackSpecTag [%s] on %s."),
+				*AttackSpecTag.ToString(),
+				*GetNameSafe(Character));
+			return true;
+		}
+
+		if (AttackDataRow->StaminaCost <= 0.0f)
+		{
+			return true;
+		}
+
+		if (!Character->ConsumeStamina(AttackDataRow->StaminaCost))
+		{
+			UE_LOG(LogStateTree, Verbose, TEXT("ComboMontagePlay blocked by stamina cost: %s requires %.2f stamina for [%s]."),
+				*GetNameSafe(Character),
+				AttackDataRow->StaminaCost,
+				*AttackSpecTag.ToString());
+			return false;
+		}
+
+		return true;
+	}
 }
 
 FSTT_ComboMontagePlay::FSTT_ComboMontagePlay()
@@ -218,6 +269,11 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 
 	AMHWCharacter* Character = InstanceData.MHWCharacter;
 	if (!Character || !ComboMontage)
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+
+	if (!ComboMontagePlayTask::TryConsumeConfiguredStamina(Character, AttackSpecTag))
 	{
 		return EStateTreeRunStatus::Failed;
 	}

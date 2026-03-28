@@ -3,6 +3,7 @@
 #include "AbilitySystem/Attributes/MHWCombatAttributeSet.h"
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "Character/MHWCombatComponent.h"
+#include "Character/MHWMonsterCombatComponent.h"
 #include "Components/SceneComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatPawn)
@@ -15,7 +16,7 @@ AMHWCombatPawn::AMHWCombatPawn(const FObjectInitializer& ObjectInitializer)
 
 	AbilitySystemComponent = ObjectInitializer.CreateDefaultSubobject<UMHWAbilitySystemComponent>(this, TEXT("AbilitySystemComponent"));
 	CombatAttributeSet = ObjectInitializer.CreateDefaultSubobject<UMHWCombatAttributeSet>(this, TEXT("CombatAttributeSet"));
-	CombatComponent = ObjectInitializer.CreateDefaultSubobject<UMHWCombatComponent>(this, TEXT("CombatComponent"));
+	CombatComponent = ObjectInitializer.CreateDefaultSubobject<UMHWMonsterCombatComponent>(this, TEXT("CombatComponent"));
 	CombatComponent->bEnableStaminaAutoRegen = false;
 }
 
