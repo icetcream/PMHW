@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Camera/MHWCombatCameraTypes.h"
 #include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "MHWAttackDataTable.generated.h"
@@ -42,4 +43,7 @@ struct PMHW_API FMHWAttackDataRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Attack", meta = (DisplayName = "软化值", ClampMin = "0.0"))
 	float TenderizeValue = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MHW|Attack|Camera", meta = (DisplayName = "命中镜头抖动"))
+	FMHWCameraSpringShakeSettings HitCameraShake;
 };

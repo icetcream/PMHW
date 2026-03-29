@@ -11,6 +11,8 @@
 #include "MotionWarpingComponent.h"
 #include "Animation/MHWAnimInstance.h"
 #include "Character/MHWAttackComponent.h"
+#include "Camera/CameraComponent.h"
+#include "Camera/MHWCombatCameraComponent.h"
 #include "Character/MHWCombatComponent.h"
 #include "Character/MHWPlayerCombatComponent.h"
 #include "Character/MHWPawnExtensionComponent.h"
@@ -22,6 +24,7 @@
 #include "Player/MHWPlayerState.h"
 #include "Settings/MovementSettings.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "GameFramework/SpringArmComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCharacter)
 
@@ -38,7 +41,20 @@ AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	MHWMeleeTraceComponent = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MHWMeleeTraceComponent"));
 	MHWAttackComponent = CreateDefaultSubobject<UMHWAttackComponent>(TEXT("MHWAttackComponent"));
 	MHWCombatComponent = CreateDefaultSubobject<UMHWPlayerCombatComponent>(TEXT("MHWCombatComponent"));
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	MHWCombatCameraComponent = CreateDefaultSubobject<UMHWCombatCameraComponent>(TEXT("MHWCombatCameraComponent"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->SetRelativeRotation(FRotator(-40.0f, 0.0f, 0.0f));
+	CameraBoom->TargetArmLength = 600.0f;
+	CameraBoom->bUsePawnControlRotation = true;
+	CameraBoom->bEnableCameraRotationLag = true;
+
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->bUsePawnControlRotation = false;
+
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;

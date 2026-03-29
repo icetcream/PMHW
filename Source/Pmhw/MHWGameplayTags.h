@@ -99,6 +99,15 @@ namespace MHWDamageDataTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AdditionalMultiplier)
 }
 
+namespace MHWCameraMotionTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GreatSword)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GreatSword_XLZ3)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GreatSword_XLZ3_Approach)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GreatSword_XLZ3_SecondPush)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GreatSword_XLZ3_Return)
+}
+
 namespace MHWRotationModeTags
 {
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(VelocityDirection)

@@ -457,11 +457,11 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 	{
 		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(Character))
 		{
-			EMHWChargeLevel ConsumedChargeLevel;
-			if (AttackComponent->ConsumePendingChargeLevel(ConsumedChargeLevel))
+			EMHWChargeLevel CurrentChargeLevel;
+			if (AttackComponent->PeekPendingChargeLevel(CurrentChargeLevel))
 			{
 				const FGameplayTag ResolvedAttackSpecTag = ComboMontagePlayTask::ResolveAttackSpecTagForChargeLevel(
-					ConsumedChargeLevel,
+					CurrentChargeLevel,
 					AttackSpecTag,
 					ChargeLevel2AttackSpecTag,
 					ChargeLevel3AttackSpecTag,
@@ -483,12 +483,23 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 	FOnMontageBlendingOutStarted BlendingOutDelegate;
 	BlendingOutDelegate.BindLambda(
 		[CharacterPtr = TWeakObjectPtr<AMHWCharacter>(Character),
+		 MontageEndedPtr = &InstanceData.bMontageEnded,
+		 MontageInterruptedPtr = &InstanceData.bMontageInterrupted,
 		 bClearMotionWarpingOnExitValue = InstanceData.bClearMotionWarpingOnExit,
 		 MotionWarpingNameValue = InstanceData.ActiveMotionWarpingName,
 		 bClearPreInputOnExitValue = bClearPreInputOnExit,
 		 bDisablePreInputOnExitValue = bDisablePreInputOnExit,
 		 bDidCleanup = false](UAnimMontage* Montage, bool bInterrupted) mutable
 	{
+		if (MontageEndedPtr)
+		{
+			*MontageEndedPtr = true;
+		}
+		if (MontageInterruptedPtr)
+		{
+			*MontageInterruptedPtr = bInterrupted;
+		}
+
 		if (!bInterrupted || bDidCleanup)
 		{
 			return;
@@ -509,6 +520,22 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 			bDisablePreInputOnExitValue);
 	});
 	AnimInstance->Montage_SetBlendingOutDelegate(BlendingOutDelegate, ComboMontage);
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindLambda(
+		[MontageEndedPtr = &InstanceData.bMontageEnded,
+		 MontageInterruptedPtr = &InstanceData.bMontageInterrupted](UAnimMontage* Montage, bool bInterrupted)
+	{
+		if (MontageEndedPtr)
+		{
+			*MontageEndedPtr = true;
+		}
+		if (MontageInterruptedPtr)
+		{
+			*MontageInterruptedPtr = bInterrupted;
+		}
+	});
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, ComboMontage);
 
 	return EStateTreeRunStatus::Running;
 }
@@ -551,9 +578,7 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::Tick(FStateTreeExecutionContext& Cont
 		return InstanceData.bMontageInterrupted ? EStateTreeRunStatus::Failed : EStateTreeRunStatus::Succeeded;
 	}
 
-	const float SafeLength = FMath::Max(InstanceData.PlayedMontageLength, KINDA_SMALL_NUMBER);
-	const float CompletionRatio = InstanceData.LastMontagePosition / SafeLength;
-	return CompletionRatio >= SuccessCompletionThreshold ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Failed;
+	return EStateTreeRunStatus::Succeeded;
 }
 
 void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& /*Transition*/) const
@@ -575,6 +600,14 @@ void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const
 		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(InstanceData.MHWCharacter))
 		{
 			AttackComponent->ClearActiveAttackSpecTagOverride();
+		}
+	}
+
+	if (bUsePendingChargeLevel && bClearPendingChargeLevelOnExit)
+	{
+		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(InstanceData.MHWCharacter))
+		{
+			AttackComponent->ClearPendingChargeLevel();
 		}
 	}
 }

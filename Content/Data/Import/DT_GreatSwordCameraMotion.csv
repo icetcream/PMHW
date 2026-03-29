@@ -1,0 +1,4 @@
+Name,CameraMotionTag,DisplayName,CameraMotion
+GS_XLZ3_Approach,Data.CameraMotion.GreatSword.XLZ3.Approach,XLZ3 第一段靠近,"(ArmLengthOffset=-110.0,SocketOffset=(X=0.0,Y=18.0,Z=10.0),TargetOffset=(X=0.0,Y=0.0,Z=0.0),BoomRotationOffset=(Pitch=3.0,Yaw=0.0,Roll=0.0),FOVOffset=-3.5,BlendDuration=0.10)"
+GS_XLZ3_SecondPush,Data.CameraMotion.GreatSword.XLZ3.SecondPush,XLZ3 第二段压近,"(ArmLengthOffset=-150.0,SocketOffset=(X=0.0,Y=24.0,Z=14.0),TargetOffset=(X=0.0,Y=0.0,Z=0.0),BoomRotationOffset=(Pitch=4.5,Yaw=0.0,Roll=0.0),FOVOffset=-5.0,BlendDuration=0.06)"
+GS_XLZ3_Return,Data.CameraMotion.GreatSword.XLZ3.Return,XLZ3 结束回位,"(ArmLengthOffset=0.0,SocketOffset=(X=0.0,Y=0.0,Z=0.0),TargetOffset=(X=0.0,Y=0.0,Z=0.0),BoomRotationOffset=(Pitch=0.0,Yaw=0.0,Roll=0.0),FOVOffset=0.0,BlendDuration=0.26)"

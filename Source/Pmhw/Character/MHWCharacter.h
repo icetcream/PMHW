@@ -17,6 +17,7 @@ struct FMHWMovementGaitSettings;
 class UMHWMovementSettings;
 class UMHWAnimInstance;
 class UMHWAttackComponent;
+class UMHWCombatCameraComponent;
 class UMHWCombatComponent;
 class UMotionWarpingComponent;
 class UMeleeTraceComponent;
@@ -26,6 +27,8 @@ class UStateTreeComponent;
 class UMHWEquipmentManagerComponent;
 class UMHWPawnExtensionComponent;
 class UMHWHeroComponent;
+class USpringArmComponent;
+class UCameraComponent;
 class UInputMappingContext;
 class UMHWInputConfig;
 struct FInputActionValue;
@@ -83,6 +86,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
 	UMHWAttackComponent* GetAttackComponentInstance() const { return MHWAttackComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Camera")
+	UMHWCombatCameraComponent* GetCombatCameraComponent() const { return MHWCombatCameraComponent.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Camera")
+	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Camera")
+	UCameraComponent* GetFollowCamera() const { return FollowCamera.Get(); }
 	
 public:
 	// 1. 提供给外部或蓝图调用的 Setter (比如你的输入组件按下 Shift 时调用)
@@ -281,6 +293,15 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMHWPlayerCombatComponent> MHWCombatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Camera", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USpringArmComponent> CameraBoom;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Camera", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Camera", Meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMHWCombatCameraComponent> MHWCombatCameraComponent;
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = "MHW|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;

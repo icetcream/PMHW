@@ -102,6 +102,14 @@ namespace MHWDamageDataTags
 	UE_DEFINE_GAMEPLAY_TAG(HitzoneValue, "Data.Damage.HitzoneValue");
 	UE_DEFINE_GAMEPLAY_TAG(AdditionalMultiplier, "Data.Damage.AdditionalMultiplier");
 }
+namespace MHWCameraMotionTags
+{
+	UE_DEFINE_GAMEPLAY_TAG(GreatSword, "Data.CameraMotion.GreatSword");
+	UE_DEFINE_GAMEPLAY_TAG(GreatSword_XLZ3, "Data.CameraMotion.GreatSword.XLZ3");
+	UE_DEFINE_GAMEPLAY_TAG(GreatSword_XLZ3_Approach, "Data.CameraMotion.GreatSword.XLZ3.Approach");
+	UE_DEFINE_GAMEPLAY_TAG(GreatSword_XLZ3_SecondPush, "Data.CameraMotion.GreatSword.XLZ3.SecondPush");
+	UE_DEFINE_GAMEPLAY_TAG(GreatSword_XLZ3_Return, "Data.CameraMotion.GreatSword.XLZ3.Return");
+}
 namespace MHWRotationModeTags
 {
 	UE_DEFINE_GAMEPLAY_TAG(VelocityDirection, FName{TEXTVIEW("Als.RotationMode.VelocityDirection")})

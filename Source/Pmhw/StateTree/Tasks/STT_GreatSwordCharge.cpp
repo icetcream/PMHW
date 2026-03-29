@@ -6,11 +6,21 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Character/MHWAttackComponent.h"
 #include "Character/MHWCharacter.h"
+#include "Components/AudioComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Equipment/MHWEquipmentInstance.h"
+#include "Equipment/MHWEquipmentManagerComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "MHWGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Interface/CombatAnimInterface.h"
 #include "Interface/MHWCharacterInterface.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 
 namespace GreatSwordChargeTask
 {
@@ -54,6 +64,293 @@ namespace GreatSwordChargeTask
 		OutChargeLevel = EMHWChargeLevel::Level1;
 		return true;
 	}
+
+	static const FMHWChargeStageFeedback& ResolveChargeStageFeedback(const FMHWChargeFeedbackConfig& Config, const EMHWChargeLevel ChargeLevel)
+	{
+		switch (ChargeLevel)
+		{
+		case EMHWChargeLevel::Overcharged:
+			if (Config.OverchargedFeedback.CharacterVFX || Config.OverchargedFeedback.WeaponVFX || Config.OverchargedFeedback.Sound)
+			{
+				return Config.OverchargedFeedback;
+			}
+			if (Config.Level3Feedback.CharacterVFX || Config.Level3Feedback.WeaponVFX || Config.Level3Feedback.Sound)
+			{
+				return Config.Level3Feedback;
+			}
+			if (Config.Level2Feedback.CharacterVFX || Config.Level2Feedback.WeaponVFX || Config.Level2Feedback.Sound)
+			{
+				return Config.Level2Feedback;
+			}
+			return Config.Level1Feedback;
+		case EMHWChargeLevel::Level3:
+			if (Config.Level3Feedback.CharacterVFX || Config.Level3Feedback.WeaponVFX || Config.Level3Feedback.Sound)
+			{
+				return Config.Level3Feedback;
+			}
+			if (Config.Level2Feedback.CharacterVFX || Config.Level2Feedback.WeaponVFX || Config.Level2Feedback.Sound)
+			{
+				return Config.Level2Feedback;
+			}
+			return Config.Level1Feedback;
+		case EMHWChargeLevel::Level2:
+			if (Config.Level2Feedback.CharacterVFX || Config.Level2Feedback.WeaponVFX || Config.Level2Feedback.Sound)
+			{
+				return Config.Level2Feedback;
+			}
+			return Config.Level1Feedback;
+		case EMHWChargeLevel::Level1:
+		default:
+			return Config.Level1Feedback;
+		}
+	}
+
+	static USkeletalMeshComponent* ResolveChargeWeaponMesh(const FSTT_GreatSwordCharge& Task, ACharacter* Character)
+	{
+		if (!Character || !Character->Implements<UMHWCharacterInterface>())
+		{
+			return nullptr;
+		}
+
+		const UMHWEquipmentManagerComponent* EquipmentManager = IMHWCharacterInterface::Execute_GetEquipmentManagerComponent(Character);
+		if (!EquipmentManager)
+		{
+			return nullptr;
+		}
+
+		UMHWEquipmentManagerComponent* MutableEquipmentManager = const_cast<UMHWEquipmentManagerComponent*>(EquipmentManager);
+		TSubclassOf<UMHWEquipmentInstance> WeaponInstanceClass = Task.ChargeFeedback.WeaponInstanceClass;
+		if (!WeaponInstanceClass)
+		{
+			WeaponInstanceClass = UMHWEquipmentInstance::StaticClass();
+		}
+
+		if (UMHWEquipmentInstance* EquipmentInstance = MutableEquipmentManager->GetFirstInstanceOfType(WeaponInstanceClass))
+		{
+			if (AActor* WeaponActor = EquipmentInstance->GetSpawnedActor())
+			{
+				return WeaponActor->FindComponentByClass<USkeletalMeshComponent>();
+			}
+		}
+
+		return nullptr;
+	}
+
+	static void ClearActiveChargeVFX(FSTT_GreatSwordChargeInstanceData& InstanceData)
+	{
+		if (UNiagaraComponent* ActiveComponent = InstanceData.ActiveCharacterChargeVFXComponent)
+		{
+			ActiveComponent->DeactivateImmediate();
+			ActiveComponent->DestroyComponent();
+		}
+
+		if (UNiagaraComponent* ActiveComponent = InstanceData.ActiveWeaponChargeVFXComponent)
+		{
+			ActiveComponent->DeactivateImmediate();
+			ActiveComponent->DestroyComponent();
+		}
+
+		if (UAudioComponent* ActiveAudioComponent = InstanceData.ActiveChargeAudioComponent)
+		{
+			ActiveAudioComponent->Stop();
+			ActiveAudioComponent->DestroyComponent();
+		}
+
+		if (InstanceData.Character)
+		{
+			if (USkeletalMeshComponent* MeshComponent = InstanceData.Character->GetMesh())
+			{
+				const FMHWChargeDynamicMaterialState& MaterialState = InstanceData.ActiveCharacterOverlayMaterialState;
+				if (MaterialState.OriginalOverlayMaterial || MaterialState.AppliedBaseMaterial || MaterialState.DynamicMaterial)
+				{
+					MeshComponent->SetOverlayMaterial(MaterialState.OriginalOverlayMaterial);
+				}
+			}
+		}
+
+		InstanceData.ActiveCharacterChargeVFXComponent = nullptr;
+		InstanceData.ActiveWeaponChargeVFXComponent = nullptr;
+		InstanceData.ActiveChargeAudioComponent = nullptr;
+		InstanceData.ActiveCharacterOverlayMaterialState = FMHWChargeDynamicMaterialState();
+		InstanceData.bHasActiveChargeFeedbackLevel = false;
+		InstanceData.ActiveChargeFeedbackLevel = 0;
+	}
+
+	static UMaterialInstanceDynamic* FindOrCreateChargeDynamicMaterial(
+		FSTT_GreatSwordChargeInstanceData& InstanceData,
+		USkeletalMeshComponent* MeshComponent,
+		UMaterialInterface* DesiredBaseMaterial)
+	{
+		if (!MeshComponent)
+		{
+			return nullptr;
+		}
+
+		UMaterialInterface* EffectiveBaseMaterial = DesiredBaseMaterial ? DesiredBaseMaterial : MeshComponent->GetOverlayMaterial();
+		if (!EffectiveBaseMaterial)
+		{
+			return nullptr;
+		}
+
+		FMHWChargeDynamicMaterialState& MaterialState = InstanceData.ActiveCharacterOverlayMaterialState;
+		if (MaterialState.DynamicMaterial && MaterialState.AppliedBaseMaterial == EffectiveBaseMaterial)
+		{
+			return MaterialState.DynamicMaterial;
+		}
+
+		if (!MaterialState.OriginalOverlayMaterial && !MaterialState.AppliedBaseMaterial && !MaterialState.DynamicMaterial)
+		{
+			MaterialState.OriginalOverlayMaterial = MeshComponent->GetOverlayMaterial();
+		}
+
+		UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(EffectiveBaseMaterial, MeshComponent);
+		if (!DynamicMaterial)
+		{
+			return nullptr;
+		}
+
+		MeshComponent->SetOverlayMaterial(DynamicMaterial);
+		MaterialState.AppliedBaseMaterial = EffectiveBaseMaterial;
+		MaterialState.DynamicMaterial = DynamicMaterial;
+		return MaterialState.DynamicMaterial;
+	}
+
+	static void ApplyChargeCharacterMaterialFeedback(
+		FSTT_GreatSwordChargeInstanceData& InstanceData,
+		USkeletalMeshComponent* MeshComponent,
+		const FMHWChargeStageFeedback& Feedback)
+	{
+		if (!MeshComponent)
+		{
+			return;
+		}
+
+		for (const FMHWChargeCharacterMaterialFeedback& MaterialFeedback : Feedback.CharacterMaterialFeedbacks)
+		{
+			UMaterialInstanceDynamic* DynamicMaterial = FindOrCreateChargeDynamicMaterial(
+				InstanceData,
+				MeshComponent,
+				MaterialFeedback.OverrideMaterial);
+			if (!DynamicMaterial)
+			{
+				continue;
+			}
+
+			for (const FMHWChargeScalarMaterialParameter& ScalarParameter : MaterialFeedback.ScalarParameters)
+			{
+				if (ScalarParameter.ParameterName != NAME_None)
+				{
+					DynamicMaterial->SetScalarParameterValue(ScalarParameter.ParameterName, ScalarParameter.Value);
+				}
+			}
+
+			for (const FMHWChargeVectorMaterialParameter& VectorParameter : MaterialFeedback.VectorParameters)
+			{
+				if (VectorParameter.ParameterName != NAME_None)
+				{
+					DynamicMaterial->SetVectorParameterValue(VectorParameter.ParameterName, VectorParameter.Value);
+				}
+			}
+		}
+	}
+
+	static void UpdateChargeLevelVFX(const FSTT_GreatSwordCharge& Task, FSTT_GreatSwordChargeInstanceData& InstanceData, ACharacter* Character)
+	{
+		if (!Character)
+		{
+			ClearActiveChargeVFX(InstanceData);
+			return;
+		}
+
+		EMHWChargeLevel CurrentChargeLevel = EMHWChargeLevel::Level1;
+		ResolvePendingChargeLevel(Task, InstanceData.CurrentChargeTime, CurrentChargeLevel);
+
+		if (InstanceData.bHasActiveChargeFeedbackLevel && InstanceData.ActiveChargeFeedbackLevel == static_cast<uint8>(CurrentChargeLevel))
+		{
+			return;
+		}
+
+		ClearActiveChargeVFX(InstanceData);
+		const FMHWChargeStageFeedback& Feedback = ResolveChargeStageFeedback(Task.ChargeFeedback, CurrentChargeLevel);
+
+		USkeletalMeshComponent* MeshComponent = Character->GetMesh();
+		if (!MeshComponent)
+		{
+			return;
+		}
+
+		if (Feedback.CharacterVFX)
+		{
+			if (UNiagaraComponent* SpawnedComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+				Feedback.CharacterVFX,
+				MeshComponent,
+				Task.ChargeFeedback.CharacterAttachSocketName,
+				Task.ChargeFeedback.CharacterLocationOffset,
+				Task.ChargeFeedback.CharacterRotationOffset,
+				EAttachLocation::KeepRelativeOffset,
+				false,
+				true))
+			{
+				SpawnedComponent->SetRelativeScale3D(Task.ChargeFeedback.CharacterScale);
+				InstanceData.ActiveCharacterChargeVFXComponent = SpawnedComponent;
+			}
+		}
+
+		ApplyChargeCharacterMaterialFeedback(InstanceData, MeshComponent, Feedback);
+
+		if (Feedback.WeaponVFX)
+		{
+			if (USkeletalMeshComponent* WeaponMesh = ResolveChargeWeaponMesh(Task, Character))
+			{
+				if (UNiagaraComponent* SpawnedComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+					Feedback.WeaponVFX,
+					WeaponMesh,
+					Task.ChargeFeedback.WeaponAttachSocketName,
+					Task.ChargeFeedback.WeaponLocationOffset,
+					Task.ChargeFeedback.WeaponRotationOffset,
+					EAttachLocation::KeepRelativeOffset,
+					false,
+					true))
+				{
+					SpawnedComponent->SetRelativeScale3D(Task.ChargeFeedback.WeaponScale);
+					InstanceData.ActiveWeaponChargeVFXComponent = SpawnedComponent;
+				}
+			}
+		}
+
+		if (Feedback.Sound)
+		{
+			USceneComponent* SoundAttachComponent = MeshComponent;
+			if (Task.ChargeFeedback.bAttachSoundToWeapon)
+			{
+				if (USkeletalMeshComponent* WeaponMesh = ResolveChargeWeaponMesh(Task, Character))
+				{
+					SoundAttachComponent = WeaponMesh;
+				}
+			}
+
+			if (SoundAttachComponent)
+			{
+				InstanceData.ActiveChargeAudioComponent = UGameplayStatics::SpawnSoundAttached(
+					Feedback.Sound,
+					SoundAttachComponent,
+					Task.ChargeFeedback.SoundAttachSocketName,
+					Task.ChargeFeedback.SoundLocationOffset,
+					Task.ChargeFeedback.SoundRotationOffset,
+					EAttachLocation::KeepRelativeOffset,
+					false,
+					1.0f,
+					1.0f,
+					0.0f,
+					nullptr,
+					nullptr,
+					true);
+			}
+		}
+
+		InstanceData.bHasActiveChargeFeedbackLevel = true;
+		InstanceData.ActiveChargeFeedbackLevel = static_cast<uint8>(CurrentChargeLevel);
+	}
 }
 
 EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
@@ -73,6 +370,7 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 	InstanceData.CurrentTurnYaw = 0.0f;
 	InstanceData.CurrentChargeTime = 0.0f;
 	InstanceData.bOwnsSpecificChargeTag = false;
+	GreatSwordChargeTask::ClearActiveChargeVFX(InstanceData);
 
 	// 【添加具体的蓄力 Tag】
 	// 如果你填的是 State.Combat.Charging.Level2，角色身上就会有这个 Tag。
@@ -96,6 +394,8 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::EnterState(FStateTreeExecutionContext
 		}
 	}
 
+	GreatSwordChargeTask::UpdateChargeLevelVFX(*this, InstanceData, Character);
+
 	return EStateTreeRunStatus::Running;
 }
 
@@ -106,13 +406,16 @@ EStateTreeRunStatus FSTT_GreatSwordCharge::Tick(FStateTreeExecutionContext& Cont
 	
 	// 1. 累加蓄力时间
 	InstanceData.CurrentChargeTime += DeltaTime;
+	ACharacter* Character = InstanceData.Character;
+
+	if (!Character) return EStateTreeRunStatus::Failed;
+
+	GreatSwordChargeTask::UpdateChargeLevelVFX(*this, InstanceData, Character);
+
 	if (InstanceData.CurrentChargeTime >= MaxChargeDuration)
 	{
 		return EStateTreeRunStatus::Succeeded; 
 	}
-	ACharacter* Character = InstanceData.Character;
-
-	if (!Character) return EStateTreeRunStatus::Failed;
 
 	// ===================== 核心角度计算 (基于真实物理意图) =====================
 	
@@ -244,4 +547,5 @@ void FSTT_GreatSwordCharge::ExitState(FStateTreeExecutionContext& Context, const
 
 	InstanceData.CurrentChargeTime = 0.0f;
 	InstanceData.bOwnsSpecificChargeTag = false;
+	GreatSwordChargeTask::ClearActiveChargeVFX(InstanceData);
 }

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/MHWDamageTypes.h"
+#include "Camera/MHWCombatCameraTypes.h"
 #include "Character/MHWMeleeHitVFXTypes.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
@@ -83,6 +84,10 @@ public:
 	void ClearCachedAttackDisplayName();
 
 	FString GetCachedAttackDisplayName() const;
+
+	void SetCachedHitCameraShake(const FMHWCameraSpringShakeSettings& InHitCameraShake);
+
+	void ClearCachedHitCameraShake();
 
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace|VFX")
 	void SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec);
@@ -189,4 +194,7 @@ private:
 
 	UPROPERTY(Transient)
 	FText CachedAttackDisplayName;
+
+	UPROPERTY(Transient)
+	FMHWCameraSpringShakeSettings CachedHitCameraShake;
 };

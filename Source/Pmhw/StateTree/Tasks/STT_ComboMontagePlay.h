@@ -73,6 +73,9 @@ struct PMHW_API FSTT_ComboMontagePlay : public FStateTreeTaskCommonBase
 	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "!bUsePendingChargeLevel", EditConditionHides))
 	bool bClearPendingChargeLevelOnEnter = false;
 
+	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "bUsePendingChargeLevel", EditConditionHides))
+	bool bClearPendingChargeLevelOnExit = true;
+
 	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "bUsePendingChargeLevel", EditConditionHides, Categories = "Data.AttackSpec"))
 	FGameplayTag ChargeLevel2AttackSpecTag;
 
@@ -81,9 +84,6 @@ struct PMHW_API FSTT_ComboMontagePlay : public FStateTreeTaskCommonBase
 
 	UPROPERTY(EditAnywhere, Category = "Cost", meta = (EditCondition = "bUsePendingChargeLevel", EditConditionHides, Categories = "Data.AttackSpec"))
 	FGameplayTag OverchargedAttackSpecTag;
-
-	UPROPERTY(EditAnywhere, Category = "Montage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float SuccessCompletionThreshold = 0.95f;
 
 	UPROPERTY(EditAnywhere, Category = "Gameplay Tags")
 	bool bRemoveTagOnEnter = false;

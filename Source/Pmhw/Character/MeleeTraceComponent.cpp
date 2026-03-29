@@ -17,6 +17,8 @@
 #include "Character/MHWCombatComponent.h"
 #include "Character/MHWMonsterCombatComponent.h"
 #include "Character/MHWPlayerCombatComponent.h"
+#include "GameFramework/Pawn.h"
+#include "Player/MHWPlayerController.h"
 
 
 UMeleeTraceComponent::UMeleeTraceComponent()
@@ -516,6 +518,16 @@ FString UMeleeTraceComponent::GetCachedAttackDisplayName() const
 	return CachedAttackDisplayName.IsEmpty() ? FString() : CachedAttackDisplayName.ToString();
 }
 
+void UMeleeTraceComponent::SetCachedHitCameraShake(const FMHWCameraSpringShakeSettings& InHitCameraShake)
+{
+	CachedHitCameraShake = InHitCameraShake;
+}
+
+void UMeleeTraceComponent::ClearCachedHitCameraShake()
+{
+	CachedHitCameraShake = FMHWCameraSpringShakeSettings();
+}
+
 void UMeleeTraceComponent::StopTrace()
 {
 	bIsTracing = false;
@@ -646,6 +658,13 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 								GetCachedAttackDisplayName());
 						}
 						ApplyHitStop(HitActor);
+
+						APawn* OwnerPawn = Cast<APawn>(GetOwner());
+						AMHWPlayerController* PlayerController = OwnerPawn ? Cast<AMHWPlayerController>(OwnerPawn->GetController()) : nullptr;
+						if (PlayerController && PlayerController->IsLocalController() && CachedHitCameraShake.IsEnabled())
+						{
+							PlayerController->PlayCombatCameraSpringShake(CachedHitCameraShake);
+						}
 					}
 				}
 			}

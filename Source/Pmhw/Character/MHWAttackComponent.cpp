@@ -80,6 +80,7 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 	CachedMeleeTraceComponent->SetCachedPhysicalDamageSpec(ResolvedDamageSpec);
 	if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(ResolvedAttackSpecTag))
 	{
+		CachedMeleeTraceComponent->SetCachedHitCameraShake(AttackDataRow->HitCameraShake);
 		if (!AttackDataRow->AttackDisplayName.IsEmpty())
 		{
 			CachedMeleeTraceComponent->SetCachedAttackDisplayName(AttackDataRow->AttackDisplayName);
@@ -91,6 +92,7 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 	}
 	else
 	{
+		CachedMeleeTraceComponent->ClearCachedHitCameraShake();
 		if (ResolvedAttackSpecTag.IsValid())
 		{
 			CachedMeleeTraceComponent->SetCachedAttackDisplayName(FText::FromString(ResolvedAttackSpecTag.ToString()));
@@ -226,6 +228,7 @@ void UMHWAttackComponent::StopTraceAndClearDamageSpec()
 	CachedMeleeTraceComponent->StopTrace();
 	CachedMeleeTraceComponent->ClearCachedPhysicalDamageSpec();
 	CachedMeleeTraceComponent->ClearCachedAttackDisplayName();
+	CachedMeleeTraceComponent->ClearCachedHitCameraShake();
 	CachedMeleeTraceComponent->ClearHitVFXSpec();
 	CachedMeleeTraceComponent->ClearHitStopConfig();
 }
