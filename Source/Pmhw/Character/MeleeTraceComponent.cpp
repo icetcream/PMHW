@@ -1,4 +1,5 @@
 ﻿#include "MeleeTraceComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "DrawDebugHelpers.h"
@@ -50,6 +51,71 @@ USkeletalMeshComponent* UMeleeTraceComponent::GetWeaponMesh()
 		}
 	}
 	return OwnerMeshComp;
+}
+
+UCapsuleComponent* UMeleeTraceComponent::GetOwnerCapsuleComponent()
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerCapsuleComp && OwnerActor)
+	{
+		OwnerCapsuleComp = OwnerActor->FindComponentByClass<UCapsuleComponent>();
+	}
+
+	return OwnerCapsuleComp;
+}
+
+void UMeleeTraceComponent::HandleHitResult(const FHitResult& Hit)
+{
+	AActor* HitActor = Hit.GetActor();
+	if (!HitActor || HitActors.Contains(HitActor))
+	{
+		return;
+	}
+
+	HitActors.Add(HitActor);
+	OnMeleeHit.Broadcast(Hit);
+	SpawnHitVFX(Hit);
+
+	const bool bUseCachedPhysicalDamageSpec = HasCachedPhysicalDamageSpec();
+	const bool bHasDamagePayload = bUseCachedPhysicalDamageSpec ? true : (BaseDamage > 0.0f);
+	if (bApplyDamageOnHit && bHasDamagePayload)
+	{
+		FMHWPhysicalDamageSpec RuntimeDamageSpec = bUseCachedPhysicalDamageSpec
+			? CachedPhysicalDamageSpec
+			: FMHWPhysicalDamageSpec();
+		if (!bUseCachedPhysicalDamageSpec)
+		{
+			RuntimeDamageSpec.TrueRawAttack = BaseDamage;
+		}
+
+		UMHWPlayerCombatComponent* SourceCombatComponent = GetOwner()
+			? GetOwner()->FindComponentByClass<UMHWPlayerCombatComponent>()
+			: nullptr;
+		UMHWMonsterCombatComponent* TargetCombatComponent = HitActor
+			? HitActor->FindComponentByClass<UMHWMonsterCombatComponent>()
+			: nullptr;
+
+		const FMHWPhysicalDamageSpec ResolvedDamageSpec = SourceCombatComponent
+			? SourceCombatComponent->BuildResolvedOutgoingPhysicalDamageSpec(RuntimeDamageSpec, TargetCombatComponent)
+			: RuntimeDamageSpec;
+
+		UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(
+			HitActor,
+			GetOwner(),
+			ResolvedDamageSpec,
+			true,
+			Hit.ImpactPoint,
+			GetCachedAttackDisplayName());
+	}
+
+	ApplyHitStop(HitActor);
+
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	AMHWPlayerController* PlayerController = OwnerPawn ? Cast<AMHWPlayerController>(OwnerPawn->GetController()) : nullptr;
+	if (PlayerController && PlayerController->IsLocalController() && CachedHitCameraShake.IsEnabled())
+	{
+		PlayerController->PlayCombatCameraSpringShake(CachedHitCameraShake);
+	}
 }
 
 void UMeleeTraceComponent::ApplyHitStop(AActor* HitActor)
@@ -320,6 +386,8 @@ void UMeleeTraceComponent::SpawnHitVFX(const FHitResult& HitResult) const
 		SpawnRotation,
 		CurrentHitVFXSpec.Scale,
 		true,
+		true,
+		ENCPoolMethod::AutoRelease,
 		true);
 }
 
@@ -402,8 +470,35 @@ void UMeleeTraceComponent::StartTrace(FName InBaseSocket, const TArray<FName>& I
 		TraceSocketsLocalOffsets.Add(LocalLoc);
 	}
 
+	CurrentTraceMode = EMHWTraceMode::WeaponSockets;
 	bIsTracing = true;
 	SetComponentTickEnabled(true); 
+}
+
+void UMeleeTraceComponent::StartCharacterCollisionTrace()
+{
+	GetWeaponMesh();
+	UCapsuleComponent* CapsuleComponent = GetOwnerCapsuleComponent();
+	if (!CapsuleComponent)
+	{
+		return;
+	}
+
+	if (!CurrentHitstopData && CachedEquipmentInstance)
+	{
+		CurrentHitstopData = CachedEquipmentInstance->GetHitStopData();
+		CurrentHitstopStrengthMultiplier = 1.0f;
+	}
+
+	HitActors.Empty();
+	TraceSocketsLocalOffsets.Empty();
+	ActiveTraceSockets.Empty();
+	BaseSocketName = NAME_None;
+	PreviousOwnerCapsuleTransform = CapsuleComponent->GetComponentTransform();
+
+	CurrentTraceMode = EMHWTraceMode::OwnerCapsule;
+	bIsTracing = true;
+	SetComponentTickEnabled(true);
 }
 
 bool UMeleeTraceComponent::ResolveTraceConfig(const FName& OverrideBaseSocket, const TArray<FName>& OverrideTraceSockets, FName& OutBaseSocket, TArray<FName>& OutTraceSockets)
@@ -534,6 +629,8 @@ void UMeleeTraceComponent::StopTrace()
 	HitActors.Empty();
 	TraceSocketsLocalOffsets.Empty();
 	ActiveTraceSockets.Empty();
+	BaseSocketName = NAME_None;
+	CurrentTraceMode = EMHWTraceMode::WeaponSockets;
 	if (!IsHitstopActive())
 	{
 		SetComponentTickEnabled(false);
@@ -557,8 +654,7 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	if (!World) return;
 
 	UpdateHitstop(World->GetRealTimeSeconds());
-	// 此时 OwnerMeshComp 必定是有效的（在 StartTrace 里拦截过了）
-	if (!bIsTracing || !OwnerMeshComp || DeltaTime <= 0.0f) return;
+	if (!bIsTracing || DeltaTime <= 0.0f) return;
 
 	// ====== 自适应补帧计算 ======
 	float CurrentFPS = 1.0f / DeltaTime;
@@ -576,7 +672,81 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(GetOwner());
+	if (CachedEquipmentInstance)
+	{
+		if (AActor* WeaponActor = CachedEquipmentInstance->GetSpawnedActor())
+		{
+			QueryParams.AddIgnoredActor(WeaponActor);
+		}
+	}
 	QueryParams.bTraceComplex = false; 
+
+	if (CurrentTraceMode == EMHWTraceMode::OwnerCapsule)
+	{
+		UCapsuleComponent* CapsuleComponent = GetOwnerCapsuleComponent();
+		if (!CapsuleComponent)
+		{
+			return;
+		}
+
+		const FTransform CurrentCapsuleTransform = CapsuleComponent->GetComponentTransform();
+		const FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(
+			CapsuleComponent->GetScaledCapsuleRadius(),
+			CapsuleComponent->GetScaledCapsuleHalfHeight());
+
+		for (int32 Step = 1; Step <= NumSteps; ++Step)
+		{
+			const float AlphaPrev = static_cast<float>(Step - 1) / static_cast<float>(NumSteps);
+			const float AlphaCurr = static_cast<float>(Step) / static_cast<float>(NumSteps);
+
+			FTransform StepStartCapsuleTransform;
+			StepStartCapsuleTransform.Blend(PreviousOwnerCapsuleTransform, CurrentCapsuleTransform, AlphaPrev);
+
+			FTransform StepEndCapsuleTransform;
+			StepEndCapsuleTransform.Blend(PreviousOwnerCapsuleTransform, CurrentCapsuleTransform, AlphaCurr);
+
+			TArray<FHitResult> HitResults;
+			const bool bHit = World->SweepMultiByChannel(
+				HitResults,
+				StepStartCapsuleTransform.GetLocation(),
+				StepEndCapsuleTransform.GetLocation(),
+				StepEndCapsuleTransform.GetRotation(),
+				TraceChannel,
+				CapsuleShape,
+				QueryParams);
+
+			if (bShowDebug)
+			{
+				const FColor DebugColor = bHit ? FColor::Green : FColor::Red;
+				DrawDebugCapsule(
+					World,
+					StepEndCapsuleTransform.GetLocation(),
+					CapsuleComponent->GetScaledCapsuleHalfHeight(),
+					CapsuleComponent->GetScaledCapsuleRadius(),
+					StepEndCapsuleTransform.GetRotation(),
+					DebugColor,
+					false,
+					2.0f);
+			}
+
+			if (bHit)
+			{
+				for (const FHitResult& Hit : HitResults)
+				{
+					HandleHitResult(Hit);
+				}
+			}
+		}
+
+		PreviousOwnerCapsuleTransform = CurrentCapsuleTransform;
+		return;
+	}
+
+	// 此时 OwnerMeshComp 必定是有效的（在 StartTrace 里拦截过了）
+	if (!OwnerMeshComp)
+	{
+		return;
+	}
 
 	// ====== 基于 Transform 曲线插值的纯射线判定网编织 ======
 	for (int32 Step = 1; Step <= NumSteps; ++Step)
@@ -618,54 +788,7 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 			{
 				for (const FHitResult& Hit : HitResults)
 				{
-					AActor* HitActor = Hit.GetActor();
-					if (HitActor && !HitActors.Contains(HitActor))
-					{
-						HitActors.Add(HitActor);
-						OnMeleeHit.Broadcast(Hit);
-						SpawnHitVFX(Hit);
-						const bool bUseCachedPhysicalDamageSpec = HasCachedPhysicalDamageSpec();
-						const bool bHasDamagePayload = bUseCachedPhysicalDamageSpec
-							? true
-							: (BaseDamage > 0.0f);
-						if (bApplyDamageOnHit && bHasDamagePayload)
-						{
-							FMHWPhysicalDamageSpec RuntimeDamageSpec = bUseCachedPhysicalDamageSpec
-								? CachedPhysicalDamageSpec
-								: FMHWPhysicalDamageSpec();
-							if (!bUseCachedPhysicalDamageSpec)
-							{
-								RuntimeDamageSpec.TrueRawAttack = BaseDamage;
-							}
-
-							UMHWPlayerCombatComponent* SourceCombatComponent = GetOwner()
-								? GetOwner()->FindComponentByClass<UMHWPlayerCombatComponent>()
-								: nullptr;
-							UMHWMonsterCombatComponent* TargetCombatComponent = HitActor
-								? HitActor->FindComponentByClass<UMHWMonsterCombatComponent>()
-								: nullptr;
-
-							FMHWPhysicalDamageSpec ResolvedDamageSpec = SourceCombatComponent
-								? SourceCombatComponent->BuildResolvedOutgoingPhysicalDamageSpec(RuntimeDamageSpec, TargetCombatComponent)
-								: RuntimeDamageSpec;
-
-							UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(
-								HitActor,
-								GetOwner(),
-								ResolvedDamageSpec,
-								true,
-								Hit.ImpactPoint,
-								GetCachedAttackDisplayName());
-						}
-						ApplyHitStop(HitActor);
-
-						APawn* OwnerPawn = Cast<APawn>(GetOwner());
-						AMHWPlayerController* PlayerController = OwnerPawn ? Cast<AMHWPlayerController>(OwnerPawn->GetController()) : nullptr;
-						if (PlayerController && PlayerController->IsLocalController() && CachedHitCameraShake.IsEnabled())
-						{
-							PlayerController->PlayCombatCameraSpringShake(CachedHitCameraShake);
-						}
-					}
+					HandleHitResult(Hit);
 				}
 			}
 		}

@@ -23,6 +23,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MHW|UI|Damage Number")
 	void InitializeDamageNumber(AActor* InTargetActor, float InDamageAmount, EMHWCriticalHitType InCriticalHitType, FString InAttackDisplayName = TEXT(""), bool bHasCustomSpawnLocation = false, FVector InCustomSpawnLocation = FVector::ZeroVector);
 
+	UFUNCTION(BlueprintPure, Category = "MHW|UI|Damage Number")
+	bool IsAvailableForReuse() const { return !bInUse; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|UI")
 	TObjectPtr<USceneComponent> RootSceneComponent;
@@ -52,6 +55,8 @@ private:
 	void EnsureWidgetReady();
 	void PushDamageNumberToWidget();
 	void UpdateFacingRotation();
+	void SetDamageNumberActive(bool bInActive);
+	void DeactivateDamageNumber();
 	FVector ResolveSpawnLocation(AActor* InTargetActor) const;
 	FVector ResolveSpawnLocationFromImpactPoint(const FVector& ImpactPoint) const;
 
@@ -81,4 +86,7 @@ private:
 
 	UPROPERTY(Transient)
 	bool bInitialized = false;
+
+	UPROPERTY(Transient)
+	bool bInUse = false;
 };

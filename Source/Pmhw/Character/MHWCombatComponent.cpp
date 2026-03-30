@@ -22,6 +22,7 @@ void UMHWCombatComponent::BeginPlay()
 	Super::BeginPlay();
 
 	TryInitializeFromOwner();
+	InitializeDamageNumberPool();
 }
 
 void UMHWCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -296,7 +297,83 @@ void UMHWCombatComponent::NotifyDamageReceived(float DamageAmount, float NewHeal
 	SpawnDamageNumberActor(DamageAmount, CriticalHitType, bHasDamageNumberWorldLocation, DamageNumberWorldLocation, AttackDisplayName);
 }
 
-void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName) const
+void UMHWCombatComponent::InitializeDamageNumberPool()
+{
+	if (bDamageNumberPoolInitialized)
+	{
+		return;
+	}
+
+	bDamageNumberPoolInitialized = true;
+
+	if (!bSpawnDamageNumberOnDamage || !DamageNumberActorClass || InitialDamageNumberPoolSize <= 0)
+	{
+		return;
+	}
+
+	for (int32 Index = 0; Index < InitialDamageNumberPoolSize; ++Index)
+	{
+		if (!SpawnPooledDamageNumberActor())
+		{
+			break;
+		}
+	}
+}
+
+AMHWDamageNumberActor* UMHWCombatComponent::AcquireDamageNumberActor()
+{
+	InitializeDamageNumberPool();
+
+	for (int32 Index = DamageNumberActorPool.Num() - 1; Index >= 0; --Index)
+	{
+		AMHWDamageNumberActor* DamageNumberActor = DamageNumberActorPool[Index];
+		if (!IsValid(DamageNumberActor))
+		{
+			DamageNumberActorPool.RemoveAtSwap(Index);
+			continue;
+		}
+
+		if (DamageNumberActor->IsAvailableForReuse())
+		{
+			return DamageNumberActor;
+		}
+	}
+
+	if (MaxDamageNumberPoolSize > 0 && DamageNumberActorPool.Num() >= MaxDamageNumberPoolSize)
+	{
+		return nullptr;
+	}
+
+	return SpawnPooledDamageNumberActor();
+}
+
+AMHWDamageNumberActor* UMHWCombatComponent::SpawnPooledDamageNumberActor()
+{
+	AActor* OwnerActor = GetOwner();
+	UWorld* World = GetWorld();
+	if (!OwnerActor || !World || !DamageNumberActorClass)
+	{
+		return nullptr;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = OwnerActor;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	if (AMHWDamageNumberActor* DamageNumberActor = World->SpawnActor<AMHWDamageNumberActor>(
+		DamageNumberActorClass,
+		OwnerActor->GetActorLocation(),
+		FRotator::ZeroRotator,
+		SpawnParameters))
+	{
+		DamageNumberActorPool.Add(DamageNumberActor);
+		return DamageNumberActor;
+	}
+
+	return nullptr;
+}
+
+void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName)
 {
 	if (!bSpawnDamageNumberOnDamage || !DamageNumberActorClass)
 	{
@@ -304,19 +381,15 @@ void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCritica
 	}
 
 	AActor* OwnerActor = GetOwner();
-	UWorld* World = GetWorld();
-	if (!OwnerActor || !World)
+	if (!OwnerActor)
 	{
 		return;
 	}
 
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.Owner = OwnerActor;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
 	const FVector SpawnLocation = bHasDamageNumberWorldLocation ? DamageNumberWorldLocation : OwnerActor->GetActorLocation();
-	if (AMHWDamageNumberActor* DamageNumberActor = World->SpawnActor<AMHWDamageNumberActor>(DamageNumberActorClass, SpawnLocation, FRotator::ZeroRotator, SpawnParameters))
+	if (AMHWDamageNumberActor* DamageNumberActor = AcquireDamageNumberActor())
 	{
+		DamageNumberActor->SetActorLocation(SpawnLocation);
 		DamageNumberActor->InitializeDamageNumber(OwnerActor, DamageAmount, CriticalHitType, AttackDisplayName, bHasDamageNumberWorldLocation, DamageNumberWorldLocation);
 	}
 }

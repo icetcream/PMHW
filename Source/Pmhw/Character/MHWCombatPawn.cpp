@@ -4,6 +4,7 @@
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "Character/MHWCombatComponent.h"
 #include "Character/MHWMonsterCombatComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatPawn)
@@ -28,6 +29,18 @@ UAbilitySystemComponent* AMHWCombatPawn::GetAbilitySystemComponent() const
 void AMHWCombatPawn::BeginPlay()
 {
 	Super::BeginPlay();
+
+	TArray<UPrimitiveComponent*> PrimitiveComponents;
+	GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+	for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)
+	{
+		if (!PrimitiveComponent || PrimitiveComponent->GetCollisionEnabled() == ECollisionEnabled::NoCollision)
+		{
+			continue;
+		}
+
+		PrimitiveComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block);
+	}
 
 	if (AbilitySystemComponent)
 	{

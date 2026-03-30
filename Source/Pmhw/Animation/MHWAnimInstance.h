@@ -9,6 +9,66 @@
 
 struct FGameplayTag;
 class UAbilitySystemComponent;
+
+USTRUCT(BlueprintType)
+struct FMHWFootLockRuntimeData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FVector CurrentLocationWS = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FRotator CurrentRotationWS = FRotator::ZeroRotator;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FVector CurrentLocationCS = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FRotator CurrentRotationCS = FRotator::ZeroRotator;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	float LockAlpha = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	bool bLocked = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FVector LockedLocationWS = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FRotator LockedRotationWS = FRotator::ZeroRotator;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FVector LockedLocationCS = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FRotator LockedRotationCS = FRotator::ZeroRotator;
+};
+
+USTRUCT(BlueprintType)
+struct FMHWControlRigInput
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control Rig")
+	bool bFootTargetsValid = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control Rig", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float PelvisOffsetAmount = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control Rig")
+	FVector FootLeftLocation = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control Rig")
+	FRotator FootLeftRotation = FRotator::ZeroRotator;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control Rig")
+	FVector FootRightLocation = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control Rig")
+	FRotator FootRightRotation = FRotator::ZeroRotator;
+};
 /**
  * 
  */
@@ -33,6 +93,9 @@ public:
 	virtual void InitializeWithAbilitySystem(UAbilitySystemComponent* ASC);
 	virtual void SetChargeTurnYaw_Implementation(float TurnYaw) override;
 
+	UFUNCTION(BlueprintPure, Category = "Control Rig", meta = (BlueprintThreadSafe))
+	FMHWControlRigInput GetControlRigInput() const;
+
 protected:
 	virtual void NativeBeginPlay() override;
 	virtual void NativeInitializeAnimation() override;
@@ -52,6 +115,33 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat State")
 	bool bIsCharging = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Foot Lock")
+	FName LeftFootCurveName = TEXT("FootLock_L");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Foot Lock")
+	FName RightFootCurveName = TEXT("FootLock_R");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Foot Lock")
+	FName LeftFootBoneName = TEXT("foot_l");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Foot Lock")
+	FName RightFootBoneName = TEXT("foot_r");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Foot Lock", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float FootLockThreshold = 0.1f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FMHWFootLockRuntimeData LeftFootLock;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	FMHWFootLockRuntimeData RightFootLock;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	float MaxFootLockAlpha = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Foot Lock")
+	bool bFootTargetsValid = false;
 	
 private:
 
@@ -71,6 +161,14 @@ private:
 
 	// 一个辅助函数，用于在 Tag 变化时重新计算当前处于哪种枚举状态
 	void UpdateChargingTypeFromTags();
+
+	void ResetFootLockRuntimeData();
+	void UpdateFootLockRuntimeData();
+	void UpdateSingleFootLockRuntimeData(
+		USkeletalMeshComponent* MeshComponent,
+		const FName CurveName,
+		const FName BoneName,
+		FMHWFootLockRuntimeData& FootLockData) const;
 
 	// 清理 ASC 标签监听，避免重复绑定和悬挂委托
 	void UnbindFromAbilitySystem();

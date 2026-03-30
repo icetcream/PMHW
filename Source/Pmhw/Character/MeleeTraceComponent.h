@@ -13,6 +13,7 @@ class UMHWHitStopData;
 class UMHWEquipmentInstance;
 class UAnimInstance;
 class UAnimMontage;
+class UCapsuleComponent;
 class USkeletalMeshComponent;
 struct FMHWAttackDataRow;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMeleeHitSignature, const FHitResult&, HitResult);
@@ -59,6 +60,9 @@ public:
 	void StartTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets);
 
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace")
+	void StartCharacterCollisionTrace();
+
+	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace")
 	void StopTrace();
 
 	bool ResolveTraceConfig(const FName& OverrideBaseSocket, const TArray<FName>& OverrideTraceSockets, FName& OutBaseSocket, TArray<FName>& OutTraceSockets);
@@ -96,6 +100,12 @@ public:
 	void ClearHitVFXSpec();
 
 private:
+	enum class EMHWTraceMode : uint8
+	{
+		WeaponSockets,
+		OwnerCapsule
+	};
+
 	enum class EHitstopRuntimePhase : uint8
 	{
 		None,
@@ -105,17 +115,23 @@ private:
 
 	// 【新增】：动态获取并缓存武器 Mesh
 	USkeletalMeshComponent* GetWeaponMesh();
+	UCapsuleComponent* GetOwnerCapsuleComponent();
+	void HandleHitResult(const FHitResult& Hit);
 
 	bool bIsTracing = false;
 
 	UPROPERTY()
 	USkeletalMeshComponent* OwnerMeshComp;
 
+	UPROPERTY()
+	UCapsuleComponent* OwnerCapsuleComp = nullptr;
+
 	FName BaseSocketName;
 	TArray<FName> ActiveTraceSockets;
 
 	// 武器基底在上一帧的世界 Transform
 	FTransform PreviousBaseTransform;
+	FTransform PreviousOwnerCapsuleTransform;
 	// 所有追踪点相对于 BaseSocket 的【固定局部坐标偏移】
 	TArray<FVector> TraceSocketsLocalOffsets;
 	// 防连击机制
@@ -197,4 +213,6 @@ private:
 
 	UPROPERTY(Transient)
 	FMHWCameraSpringShakeSettings CachedHitCameraShake;
+
+	EMHWTraceMode CurrentTraceMode = EMHWTraceMode::WeaponSockets;
 };

@@ -61,6 +61,13 @@
 		{
 			"Name": "GASAttachEditor",
 			"Enabled": true
+		},
+		{
+			"Name": "ALS",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
 		}
 	]
 }

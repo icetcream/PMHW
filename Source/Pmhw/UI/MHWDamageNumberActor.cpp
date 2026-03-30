@@ -30,25 +30,25 @@ void AMHWDamageNumberActor::BeginPlay()
 	Super::BeginPlay();
 
 	EnsureWidgetReady();
-	if (Lifetime > 0.0f)
-	{
-		SetLifeSpan(Lifetime);
-	}
-
-	if (!bInitialized)
-	{
-		StartLocation = GetActorLocation();
-	}
-
-	UpdateFacingRotation();
-	PushDamageNumberToWidget();
+	SetDamageNumberActive(false);
 }
 
 void AMHWDamageNumberActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if (!bInUse)
+	{
+		return;
+	}
+
 	ElapsedLifetime += DeltaSeconds;
+	if (Lifetime > 0.0f && ElapsedLifetime >= Lifetime)
+	{
+		DeactivateDamageNumber();
+		return;
+	}
+
 	SetActorLocation(StartLocation + FVector(0.0f, 0.0f, FloatSpeed * ElapsedLifetime));
 	UpdateFacingRotation();
 }
@@ -67,8 +67,10 @@ void AMHWDamageNumberActor::InitializeDamageNumber(AActor* InTargetActor, float 
 		: ResolveSpawnLocation(InTargetActor);
 	SetActorLocation(StartLocation);
 	bInitialized = true;
+	bInUse = true;
 
 	EnsureWidgetReady();
+	SetDamageNumberActive(true);
 	PushDamageNumberToWidget();
 	UpdateFacingRotation();
 }
@@ -105,6 +107,33 @@ void AMHWDamageNumberActor::UpdateFacingRotation()
 			}
 		}
 	}
+}
+
+void AMHWDamageNumberActor::SetDamageNumberActive(bool bInActive)
+{
+	SetActorHiddenInGame(!bInActive);
+	SetActorTickEnabled(bInActive);
+	SetActorEnableCollision(false);
+
+	if (WidgetComponent)
+	{
+		WidgetComponent->SetVisibility(bInActive, true);
+		WidgetComponent->SetHiddenInGame(!bInActive);
+	}
+}
+
+void AMHWDamageNumberActor::DeactivateDamageNumber()
+{
+	bInUse = false;
+	bInitialized = false;
+	ElapsedLifetime = 0.0f;
+	TargetActor = nullptr;
+	bHasCustomSpawnLocation = false;
+	CustomSpawnLocation = FVector::ZeroVector;
+	DamageAmount = 0.0f;
+	CriticalHitType = EMHWCriticalHitType::None;
+	AttackDisplayName.Reset();
+	SetDamageNumberActive(false);
 }
 
 FVector AMHWDamageNumberActor::ResolveSpawnLocation(AActor* InTargetActor) const

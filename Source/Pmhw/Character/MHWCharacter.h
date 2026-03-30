@@ -104,6 +104,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion")
 	FGameplayTag GetDesiredGait() const { return DesiredGait; }
 
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion")
+	void SetMaxAllowedGaitOverride(FGameplayTag NewMaxAllowedGait);
+
+	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion")
+	void ClearMaxAllowedGaitOverride();
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion")
+	bool HasMaxAllowedGaitOverride() const { return bHasMaxAllowedGaitOverride && MaxAllowedGaitOverride.IsValid(); }
+
+	UFUNCTION(BlueprintPure, Category = "MHW|Locomotion")
+	FGameplayTag GetMaxAllowedGaitOverride() const { return MaxAllowedGaitOverride; }
+
 	// Rotation data writer for StateTree tasks.
 	UFUNCTION(BlueprintCallable, Category = "MHW|Locomotion|Rotation")
 	void SetTargetYawAngle(float TargetYawAngle);
@@ -192,6 +204,12 @@ protected:
 	// 当前步态 (走/跑/冲刺)
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)
 	FGameplayTag Gait{MHWGaitTags::Walking};
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|State", Transient)
+	FGameplayTag MaxAllowedGaitOverride;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MHW|Locomotion|State", Transient)
+	bool bHasMaxAllowedGaitOverride = false;
 
 	// 动作标签 (翻滚/攻击等，用于打断常规移动)
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "MHW|Locomotion|State", Transient)

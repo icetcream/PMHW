@@ -23,6 +23,8 @@ EStateTreeRunStatus FSTT_CalcDirectionByAcceleration::EnterState(FStateTreeExecu
 	{
 		FRotator InputWorldRot = InputVector.Rotation();
 		float InputYawDelta = (InputWorldRot - Character->GetActorRotation()).GetNormalized().Yaw;
+		const float ResolvedRightWarpCompensationYaw =
+			bRightTurnUseNegativeWarpCompensation ? -FMath::Abs(RightWarpCompensationYaw) : FMath::Abs(RightWarpCompensationYaw);
 
 		// 定义动画本身自带的角度偏移
 		float AnimOffsetYaw = 0.0f;
@@ -34,22 +36,22 @@ EStateTreeRunStatus FSTT_CalcDirectionByAcceleration::EnterState(FStateTreeExecu
 			if (AbsYaw <= ClampedForwardHalfAngle)
 			{
 				InstanceData.OutDirectionSection = Direction_Forward;
-				AnimOffsetYaw = 0.0f;
+				AnimOffsetYaw = ForwardWarpCompensationYaw;
 			}
 			else if (InputYawDelta > ClampedForwardHalfAngle && InputYawDelta <= 180.0f - ClampedForwardHalfAngle)
 			{
 				InstanceData.OutDirectionSection = Direction_Right;
-				AnimOffsetYaw = bRightTurnUseNegativeWarpCompensation ? -90.0f : 90.0f;
+				AnimOffsetYaw = ResolvedRightWarpCompensationYaw;
 			}
 			else if (InputYawDelta < -ClampedForwardHalfAngle && InputYawDelta >= -180.0f + ClampedForwardHalfAngle)
 			{
 				InstanceData.OutDirectionSection = Direction_Left;
-				AnimOffsetYaw = -90.0f;
+				AnimOffsetYaw = LeftWarpCompensationYaw;
 			}
 			else
 			{
 				InstanceData.OutDirectionSection = Direction_Backward;
-				AnimOffsetYaw = 180.0f;
+				AnimOffsetYaw = BackwardWarpCompensationYaw;
 			}
 		}
 		else
@@ -58,17 +60,17 @@ EStateTreeRunStatus FSTT_CalcDirectionByAcceleration::EnterState(FStateTreeExecu
 			if (AbsYaw <= ClampedForwardHalfAngle)
 			{
 				InstanceData.OutDirectionSection = Direction_Forward;
-				AnimOffsetYaw = 0.0f;
+				AnimOffsetYaw = ForwardWarpCompensationYaw;
 			}
 			else if (InputYawDelta > 0.0f)
 			{
 				InstanceData.OutDirectionSection = Direction_Right;
-				AnimOffsetYaw = bRightTurnUseNegativeWarpCompensation ? -90.0f : 90.0f;
+				AnimOffsetYaw = ResolvedRightWarpCompensationYaw;
 			}
 			else
 			{
 				InstanceData.OutDirectionSection = Direction_Left;
-				AnimOffsetYaw = -90.0f;
+				AnimOffsetYaw = LeftWarpCompensationYaw;
 			}
 		}
 

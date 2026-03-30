@@ -141,13 +141,13 @@ namespace GreatSwordChargeTask
 		if (UNiagaraComponent* ActiveComponent = InstanceData.ActiveCharacterChargeVFXComponent)
 		{
 			ActiveComponent->DeactivateImmediate();
-			ActiveComponent->DestroyComponent();
+			ActiveComponent->ReleaseToPool();
 		}
 
 		if (UNiagaraComponent* ActiveComponent = InstanceData.ActiveWeaponChargeVFXComponent)
 		{
 			ActiveComponent->DeactivateImmediate();
-			ActiveComponent->DestroyComponent();
+			ActiveComponent->ReleaseToPool();
 		}
 
 		if (UAudioComponent* ActiveAudioComponent = InstanceData.ActiveChargeAudioComponent)
@@ -289,6 +289,8 @@ namespace GreatSwordChargeTask
 				Task.ChargeFeedback.CharacterRotationOffset,
 				EAttachLocation::KeepRelativeOffset,
 				false,
+				true,
+				ENCPoolMethod::ManualRelease,
 				true))
 			{
 				SpawnedComponent->SetRelativeScale3D(Task.ChargeFeedback.CharacterScale);
@@ -310,6 +312,8 @@ namespace GreatSwordChargeTask
 					Task.ChargeFeedback.WeaponRotationOffset,
 					EAttachLocation::KeepRelativeOffset,
 					false,
+					true,
+					ENCPoolMethod::ManualRelease,
 					true))
 				{
 					SpawnedComponent->SetRelativeScale3D(Task.ChargeFeedback.WeaponScale);

@@ -8,10 +8,37 @@
 #include "MHWGameplayTags.h"
 #include "Character/MHWCharacter.h"
 #include "Character/MHWMovementComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 
 UMHWAnimInstance::UMHWAnimInstance(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+}
+
+FMHWControlRigInput UMHWAnimInstance::GetControlRigInput() const
+{
+	FMHWControlRigInput Input;
+	Input.bFootTargetsValid = bFootTargetsValid;
+	Input.PelvisOffsetAmount = MaxFootLockAlpha;
+
+	const FVector LeftFinalLocation = FMath::Lerp(LeftFootLock.CurrentLocationCS, LeftFootLock.LockedLocationCS, LeftFootLock.LockAlpha);
+	const FVector RightFinalLocation = FMath::Lerp(RightFootLock.CurrentLocationCS, RightFootLock.LockedLocationCS, RightFootLock.LockAlpha);
+
+	const FQuat LeftFinalRotation = FQuat::Slerp(
+		LeftFootLock.CurrentRotationCS.Quaternion(),
+		LeftFootLock.LockedRotationCS.Quaternion(),
+		LeftFootLock.LockAlpha);
+	const FQuat RightFinalRotation = FQuat::Slerp(
+		RightFootLock.CurrentRotationCS.Quaternion(),
+		RightFootLock.LockedRotationCS.Quaternion(),
+		RightFootLock.LockAlpha);
+
+	Input.FootLeftLocation = LeftFinalLocation;
+	Input.FootLeftRotation = LeftFinalRotation.Rotator();
+	Input.FootRightLocation = RightFinalLocation;
+	Input.FootRightRotation = RightFinalRotation.Rotator();
+
+	return Input;
 }
 
 void UMHWAnimInstance::InitializeWithAbilitySystem(UAbilitySystemComponent* ASC)
@@ -53,6 +80,7 @@ void UMHWAnimInstance::NativeBeginPlay()
 	CurrentChargeYaw = 0.0f;
 	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
 	bIsCharging = false;
+	ResetFootLockRuntimeData();
 	if (AActor* OwningActor = GetOwningActor())
 	{
 		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor))
@@ -68,6 +96,7 @@ void UMHWAnimInstance::NativeInitializeAnimation()
 	CurrentChargeYaw = 0.0f;
 	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
 	bIsCharging = false;
+	ResetFootLockRuntimeData();
 	if (AActor* OwningActor = GetOwningActor())
 	{
 		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor))
@@ -83,6 +112,7 @@ void UMHWAnimInstance::NativeUninitializeAnimation()
 	CurrentChargeYaw = 0.0f;
 	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
 	bIsCharging = false;
+	ResetFootLockRuntimeData();
 	Super::NativeUninitializeAnimation();
 }
 
@@ -99,6 +129,7 @@ void UMHWAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	UMHWMovementComponent* CharMoveComp = CastChecked<UMHWMovementComponent>(Character->GetCharacterMovement());
 	const FMHWCharacterGroundInfo& GroundInfo = CharMoveComp->GetGroundInfo();
 	GroundDistance = GroundInfo.GroundDistance;
+	UpdateFootLockRuntimeData();
 }
 
 void UMHWAnimInstance::OnChargeTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
@@ -214,4 +245,71 @@ void UMHWAnimInstance::UnbindFromAbilitySystem()
 	ChargeLevel2TagDelegateHandle.Reset();
 	ChargeLevel3TagDelegateHandle.Reset();
 	CachedASC.Reset();
+}
+
+void UMHWAnimInstance::ResetFootLockRuntimeData()
+{
+	LeftFootLock = FMHWFootLockRuntimeData();
+	RightFootLock = FMHWFootLockRuntimeData();
+	MaxFootLockAlpha = 0.0f;
+	bFootTargetsValid = false;
+}
+
+void UMHWAnimInstance::UpdateFootLockRuntimeData()
+{
+	USkeletalMeshComponent* MeshComponent = GetSkelMeshComponent();
+	if (!MeshComponent)
+	{
+		ResetFootLockRuntimeData();
+		return;
+	}
+
+	UpdateSingleFootLockRuntimeData(MeshComponent, LeftFootCurveName, LeftFootBoneName, LeftFootLock);
+	UpdateSingleFootLockRuntimeData(MeshComponent, RightFootCurveName, RightFootBoneName, RightFootLock);
+
+	MaxFootLockAlpha = FMath::Max(LeftFootLock.LockAlpha, RightFootLock.LockAlpha);
+	bFootTargetsValid = true;
+}
+
+void UMHWAnimInstance::UpdateSingleFootLockRuntimeData(
+	USkeletalMeshComponent* MeshComponent,
+	const FName CurveName,
+	const FName BoneName,
+	FMHWFootLockRuntimeData& FootLockData) const
+{
+	if (!MeshComponent || BoneName.IsNone())
+	{
+		FootLockData = FMHWFootLockRuntimeData();
+		return;
+	}
+
+	FootLockData.LockAlpha = FMath::Clamp(GetCurveValue(CurveName), 0.0f, 1.0f);
+	const bool bShouldLock = FootLockData.LockAlpha > FootLockThreshold;
+
+	const FTransform CurrentFootWorldTransform = MeshComponent->GetSocketTransform(BoneName, RTS_World);
+	FootLockData.CurrentLocationWS = CurrentFootWorldTransform.GetLocation();
+	FootLockData.CurrentRotationWS = CurrentFootWorldTransform.Rotator();
+
+	const FTransform MeshWorldTransform = MeshComponent->GetComponentTransform();
+	FootLockData.CurrentLocationCS = MeshWorldTransform.InverseTransformPosition(FootLockData.CurrentLocationWS);
+	FootLockData.CurrentRotationCS = MeshWorldTransform.InverseTransformRotation(FootLockData.CurrentRotationWS.Quaternion()).Rotator();
+
+	if (bShouldLock)
+	{
+		if (!FootLockData.bLocked)
+		{
+			FootLockData.bLocked = true;
+			FootLockData.LockedLocationWS = CurrentFootWorldTransform.GetLocation();
+			FootLockData.LockedRotationWS = CurrentFootWorldTransform.Rotator();
+		}
+	}
+	else
+	{
+		FootLockData.bLocked = false;
+		FootLockData.LockedLocationWS = CurrentFootWorldTransform.GetLocation();
+		FootLockData.LockedRotationWS = CurrentFootWorldTransform.Rotator();
+	}
+
+	FootLockData.LockedLocationCS = MeshWorldTransform.InverseTransformPosition(FootLockData.LockedLocationWS);
+	FootLockData.LockedRotationCS = MeshWorldTransform.InverseTransformRotation(FootLockData.LockedRotationWS.Quaternion()).Rotator();
 }

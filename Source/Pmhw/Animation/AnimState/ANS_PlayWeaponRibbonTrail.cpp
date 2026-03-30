@@ -33,10 +33,21 @@ void UANS_PlayWeaponRibbonTrail::NotifyBegin(USkeletalMeshComponent* MeshComp, U
 			NiagaraComponent->Deactivate();
 			if (bDestroyAtEnd)
 			{
-				NiagaraComponent->DestroyComponent();
+				NiagaraComponent->ReleaseToPool();
+			}
+			else
+			{
+				NiagaraComponent->SetRelativeLocation(LocationOffset);
+				NiagaraComponent->SetRelativeRotation(RotationOffset);
+				NiagaraComponent->SetRelativeScale3D(Scale);
+				NiagaraComponent->Activate(true);
+				return;
 			}
 		}
-		ActiveTrailComponents.Remove(MeshKey);
+		if (bDestroyAtEnd)
+		{
+			ActiveTrailComponents.Remove(MeshKey);
+		}
 	}
 
 	UNiagaraComponent* NiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
@@ -47,6 +58,8 @@ void UANS_PlayWeaponRibbonTrail::NotifyBegin(USkeletalMeshComponent* MeshComp, U
 		RotationOffset,
 		EAttachLocation::KeepRelativeOffset,
 		bAutoActivate,
+		true,
+		ENCPoolMethod::ManualRelease,
 		true);
 
 	if (!NiagaraComponent)
@@ -86,11 +99,14 @@ void UANS_PlayWeaponRibbonTrail::NotifyEnd(USkeletalMeshComponent* MeshComp, UAn
 		NiagaraComponent->Deactivate();
 		if (bDestroyAtEnd)
 		{
-			NiagaraComponent->DestroyComponent();
+			NiagaraComponent->ReleaseToPool();
 		}
 	}
 
-	ActiveTrailComponents.Remove(MeshKey);
+	if (bDestroyAtEnd)
+	{
+		ActiveTrailComponents.Remove(MeshKey);
+	}
 }
 
 FString UANS_PlayWeaponRibbonTrail::GetNotifyName_Implementation() const

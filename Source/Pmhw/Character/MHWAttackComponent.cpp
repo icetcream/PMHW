@@ -1,6 +1,7 @@
 #include "Character/MHWAttackComponent.h"
 
 #include "Character/MeleeTraceComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Data/MHWAttackDataTable.h"
 #include "GameFramework/Actor.h"
 #include "Interface/MHWCharacterInterface.h"
@@ -40,6 +41,7 @@ void UMHWAttackComponent::BeginAttack(FName InAttackId)
 void UMHWAttackComponent::EndAttack()
 {
 	StopTraceAndClearDamageSpec();
+	RestoreOwnerCapsuleCollisionResponse();
 	ActiveWindowSpec = FMHWAttackWindowSpec();
 	AttackRuntimeContext.Reset();
 	ClearActiveAttackSpecTagOverride();
@@ -60,6 +62,7 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 	if (AttackRuntimeContext.bWindowActive)
 	{
 		StopTraceAndClearDamageSpec();
+		RestoreOwnerCapsuleCollisionResponse();
 	}
 
 	AttackRuntimeContext.CurrentWindowIndex = WindowSpec.WindowIndex;
@@ -67,9 +70,21 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 	AttackRuntimeContext.bCurrentWindowHit = false;
 	ActiveWindowSpec = WindowSpec;
 
+	if (WindowSpec.bUseOwnerCapsuleCollisionDamage)
+	{
+		AActor* OwnerActor = GetOwner();
+		if (!OwnerActor || !OwnerActor->FindComponentByClass<UCapsuleComponent>())
+		{
+			return false;
+		}
+
+		ApplyOwnerCapsuleCollisionResponseOverride(WindowSpec);
+	}
+
 	FName ResolvedBaseSocket = NAME_None;
 	TArray<FName> ResolvedTraceSockets;
-	if (!CachedMeleeTraceComponent->ResolveTraceConfig(WindowSpec.BaseSocket, WindowSpec.TraceSockets, ResolvedBaseSocket, ResolvedTraceSockets))
+	if (!WindowSpec.bUseOwnerCapsuleCollisionDamage &&
+		!CachedMeleeTraceComponent->ResolveTraceConfig(WindowSpec.BaseSocket, WindowSpec.TraceSockets, ResolvedBaseSocket, ResolvedTraceSockets))
 	{
 		return false;
 	}
@@ -104,7 +119,14 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 	}
 	CachedMeleeTraceComponent->SetHitVFXSpec(WindowSpec.HitVFX);
 	ConfigureHitstopForWindow(WindowSpec, ResolvedAttackSpecTag, ResolvedDamageSpec);
-	CachedMeleeTraceComponent->StartTrace(ResolvedBaseSocket, ResolvedTraceSockets);
+	if (WindowSpec.bUseOwnerCapsuleCollisionDamage)
+	{
+		CachedMeleeTraceComponent->StartCharacterCollisionTrace();
+	}
+	else
+	{
+		CachedMeleeTraceComponent->StartTrace(ResolvedBaseSocket, ResolvedTraceSockets);
+	}
 	return true;
 }
 
@@ -113,6 +135,7 @@ void UMHWAttackComponent::EndAttackWindow()
 	const bool bFinishAttackOnEnd = ActiveWindowSpec.bFinishAttackOnEnd;
 
 	StopTraceAndClearDamageSpec();
+	RestoreOwnerCapsuleCollisionResponse();
 	AttackRuntimeContext.CurrentWindowIndex = INDEX_NONE;
 	AttackRuntimeContext.bWindowActive = false;
 	AttackRuntimeContext.bCurrentWindowHit = false;
@@ -122,6 +145,49 @@ void UMHWAttackComponent::EndAttackWindow()
 	{
 		EndAttack();
 	}
+}
+
+void UMHWAttackComponent::ApplyOwnerCapsuleCollisionResponseOverride(const FMHWAttackWindowSpec& WindowSpec)
+{
+	if (!WindowSpec.bUseOwnerCapsuleCollisionDamage)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	UCapsuleComponent* CapsuleComponent = OwnerActor ? OwnerActor->FindComponentByClass<UCapsuleComponent>() : nullptr;
+	if (!CapsuleComponent)
+	{
+		return;
+	}
+
+	if (!bHasPreviousOwnerCapsuleCollisionResponse)
+	{
+		PreviousOwnerCapsuleCollisionResponseChannel = WindowSpec.OwnerCapsuleCollisionResponseChannel;
+		PreviousOwnerCapsuleCollisionResponse = CapsuleComponent->GetCollisionResponseToChannel(WindowSpec.OwnerCapsuleCollisionResponseChannel);
+		bHasPreviousOwnerCapsuleCollisionResponse = true;
+	}
+
+	CapsuleComponent->SetCollisionResponseToChannel(WindowSpec.OwnerCapsuleCollisionResponseChannel, ECR_Block);
+}
+
+void UMHWAttackComponent::RestoreOwnerCapsuleCollisionResponse()
+{
+	if (!bHasPreviousOwnerCapsuleCollisionResponse)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	UCapsuleComponent* CapsuleComponent = OwnerActor ? OwnerActor->FindComponentByClass<UCapsuleComponent>() : nullptr;
+	if (CapsuleComponent)
+	{
+		CapsuleComponent->SetCollisionResponseToChannel(PreviousOwnerCapsuleCollisionResponseChannel, PreviousOwnerCapsuleCollisionResponse);
+	}
+
+	PreviousOwnerCapsuleCollisionResponse = ECR_Ignore;
+	PreviousOwnerCapsuleCollisionResponseChannel = ECC_GameTraceChannel1;
+	bHasPreviousOwnerCapsuleCollisionResponse = false;
 }
 
 void UMHWAttackComponent::NotifyCurrentWindowHit(AActor* HitActor)

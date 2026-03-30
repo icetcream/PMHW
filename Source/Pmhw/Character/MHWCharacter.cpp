@@ -28,11 +28,47 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCharacter)
 
+namespace MHWCharacterGait
+{
+	static int32 GetGaitPriority(const FGameplayTag& GaitTag)
+	{
+		if (GaitTag == MHWGaitTags::Walking)
+		{
+			return 0;
+		}
+
+		if (GaitTag == MHWGaitTags::Running)
+		{
+			return 1;
+		}
+
+		if (GaitTag == MHWGaitTags::Sprinting)
+		{
+			return 2;
+		}
+
+		return 1;
+	}
+
+	static FGameplayTag ClampGaitToMaxAllowed(const FGameplayTag& DesiredOrActualGait, const FGameplayTag& MaxAllowedGait)
+	{
+		if (!DesiredOrActualGait.IsValid() || !MaxAllowedGait.IsValid())
+		{
+			return DesiredOrActualGait;
+		}
+
+		return GetGaitPriority(DesiredOrActualGait) <= GetGaitPriority(MaxAllowedGait)
+			? DesiredOrActualGait
+			: MaxAllowedGait;
+	}
+}
+
 
 AMHWCharacter::AMHWCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UMHWMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	// 告诉 UE 使用我们自定义的 InputComponent 类，而不是默认的
+	OverrideInputComponentClass = UMHWInputComponent::StaticClass();
 
 	MHWPawnExtensionComponent = CreateDefaultSubobject<UMHWPawnExtensionComponent>(TEXT("MHWPawnExtensionComponent"));
 	MHWEquipmentManagerComponent = CreateDefaultSubobject<UMHWEquipmentManagerComponent>(TEXT("MHWEquipmentManagerComponent"));
@@ -242,6 +278,24 @@ void AMHWCharacter::SetDesiredGait(FGameplayTag NewDesiredGait)
 	}
 }
 
+void AMHWCharacter::SetMaxAllowedGaitOverride(FGameplayTag NewMaxAllowedGait)
+{
+	if (!NewMaxAllowedGait.IsValid())
+	{
+		ClearMaxAllowedGaitOverride();
+		return;
+	}
+
+	MaxAllowedGaitOverride = NewMaxAllowedGait;
+	bHasMaxAllowedGaitOverride = true;
+}
+
+void AMHWCharacter::ClearMaxAllowedGaitOverride()
+{
+	MaxAllowedGaitOverride = FGameplayTag::EmptyTag;
+	bHasMaxAllowedGaitOverride = false;
+}
+
 void AMHWCharacter::SetCurrentWeaponState(FGameplayTag NewWeaponState)
 {
 	if (NewWeaponState.IsValid())
@@ -394,19 +448,19 @@ bool AMHWCharacter::CanRotation() const
 
 FGameplayTag AMHWCharacter::CalculateMaxAllowedGait() const
 {
-	if (DesiredGait != MHWGaitTags::Sprinting)
+	FGameplayTag MaxAllowedGait = DesiredGait;
+
+	if (DesiredGait == MHWGaitTags::Sprinting && !CanSprint())
 	{
-		return DesiredGait;
+		MaxAllowedGait = MHWGaitTags::Running;
 	}
 
-	// 如果玩家想冲刺，但系统判定不满足条件，强制降级为跑步
-	if (!CanSprint())
+	if (bHasMaxAllowedGaitOverride && MaxAllowedGaitOverride.IsValid())
 	{
-		return MHWGaitTags::Running;
+		MaxAllowedGait = MHWCharacterGait::ClampGaitToMaxAllowed(MaxAllowedGait, MaxAllowedGaitOverride);
 	}
 
-	// 一切合法，允许冲刺！
-	return MHWGaitTags::Sprinting;
+	return MaxAllowedGait;
 }
 
 void AMHWCharacter::RefreshInput()
@@ -693,22 +747,23 @@ void AMHWCharacter::RefreshGait()
 	const float RunSpeed = CurrentSettings->RunSpeed;
 	const float SpeedTolerance = 10.0f; // 容差值
 
-	FGameplayTag ActualGait;
+	FGameplayTag SpeedBasedGait;
 
 	// 3. 根据【实际速度】和【最大允许步态】计算真正的状态
 	if (LocomotionState.Speed < WalkSpeed + SpeedTolerance)
 	{
-		ActualGait = MHWGaitTags::Walking;
+		SpeedBasedGait = MHWGaitTags::Walking;
 	}
-	// 如果实际速度不到冲刺的速度，或者系统根本不允许冲刺，那就是跑步
-	else if (LocomotionState.Speed < RunSpeed + SpeedTolerance || MaxAllowedGait != MHWGaitTags::Sprinting)
+	else if (LocomotionState.Speed < RunSpeed + SpeedTolerance)
 	{
-		ActualGait = MHWGaitTags::Running;
+		SpeedBasedGait = MHWGaitTags::Running;
 	}
 	else
 	{
-		ActualGait = MHWGaitTags::Sprinting;
+		SpeedBasedGait = MHWGaitTags::Sprinting;
 	}
+
+	const FGameplayTag ActualGait = MHWCharacterGait::ClampGaitToMaxAllowed(SpeedBasedGait, MaxAllowedGait);
 
 	// 4. 应用真正的 Gait
 	if (Gait != ActualGait)

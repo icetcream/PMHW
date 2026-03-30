@@ -52,11 +52,20 @@ struct PMHW_API FSTT_CalcDirectionByAcceleration : public FStateTreeTaskCommonBa
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FName Direction_Forward = FName("Forward");
 
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (ForceUnits = "deg"))
+	float ForwardWarpCompensationYaw = 0.0f;
+
 	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "OutputMode == EMHWDirectionOutputMode::FourWay", EditConditionHides))
 	FName Direction_Backward = FName("Backward");
 
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "OutputMode == EMHWDirectionOutputMode::FourWay", EditConditionHides, ForceUnits = "deg"))
+	float BackwardWarpCompensationYaw = 180.0f;
+
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FName Direction_Left = FName("Left");
+
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (ForceUnits = "deg"))
+	float LeftWarpCompensationYaw = -90.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FName Direction_Right = FName("Right");
@@ -65,6 +74,9 @@ struct PMHW_API FSTT_CalcDirectionByAcceleration : public FStateTreeTaskCommonBa
 	// 不勾选时：右转补偿角使用 +90（默认行为）。
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	bool bRightTurnUseNegativeWarpCompensation = false;
+
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (ForceUnits = "deg"))
+	float RightWarpCompensationYaw = 90.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bDebugDrawArrows = false;

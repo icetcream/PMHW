@@ -121,10 +121,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Damage Number", meta = (EditCondition = "bSpawnDamageNumberOnDamage"))
 	TSubclassOf<AMHWDamageNumberActor> DamageNumberActorClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Damage Number", meta = (EditCondition = "bSpawnDamageNumberOnDamage", ClampMin = "0"))
+	int32 InitialDamageNumberPoolSize = 6;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Combat|Damage Number", meta = (EditCondition = "bSpawnDamageNumberOnDamage", ClampMin = "0"))
+	int32 MaxDamageNumberPoolSize = 24;
+
 	void NotifyDamageReceived(float DamageAmount, float NewHealth, AActor* SourceActor, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, FVector DamageNumberWorldLocation, const FString& AttackDisplayName);
 
 private:
-	void SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName) const;
+	void InitializeDamageNumberPool();
+	AMHWDamageNumberActor* AcquireDamageNumberActor();
+	AMHWDamageNumberActor* SpawnPooledDamageNumberActor();
+	void SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName);
 	bool TryInitializeFromOwner();
 	void HandleAutomaticStaminaRegen(float DeltaSeconds);
 	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
@@ -154,4 +163,10 @@ private:
 
 	UPROPERTY(Transient)
 	float LastStaminaConsumeTime = -1.0f;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AMHWDamageNumberActor>> DamageNumberActorPool;
+
+	UPROPERTY(Transient)
+	bool bDamageNumberPoolInitialized = false;
 };
