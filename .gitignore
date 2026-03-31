@@ -101,3 +101,5 @@ $RECYCLE.BIN/
 
 # 测试文件
 /Content/Test/
+
+.vsconfig

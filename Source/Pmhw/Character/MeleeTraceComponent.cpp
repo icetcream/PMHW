@@ -18,6 +18,7 @@
 #include "Character/MHWCombatComponent.h"
 #include "Character/MHWMonsterCombatComponent.h"
 #include "Character/MHWPlayerCombatComponent.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
 #include "Player/MHWPlayerController.h"
 
@@ -32,7 +33,7 @@ UMeleeTraceComponent::UMeleeTraceComponent()
 USkeletalMeshComponent* UMeleeTraceComponent::GetWeaponMesh()
 {
 	AActor* MyCharacter = GetOwner();
-	if (!OwnerMeshComp && MyCharacter)
+	if (!WeaponMeshComp && MyCharacter)
 	{
 		if (MyCharacter->Implements<UMHWCharacterInterface>())
 		{
@@ -44,13 +45,32 @@ USkeletalMeshComponent* UMeleeTraceComponent::GetWeaponMesh()
 					AActor* WeaponActor = EquipmentInstance->GetSpawnedActor();
 					if (WeaponActor)
 					{
-						OwnerMeshComp = WeaponActor->GetComponentByClass<USkeletalMeshComponent>();
+						WeaponMeshComp = WeaponActor->GetComponentByClass<USkeletalMeshComponent>();
 					}
 				}
 			}
 		}
 	}
-	return OwnerMeshComp;
+	return WeaponMeshComp;
+}
+
+USkeletalMeshComponent* UMeleeTraceComponent::GetOwnerCharacterMesh()
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerCharacterMeshComp && OwnerActor)
+	{
+		if (const ACharacter* Character = Cast<ACharacter>(OwnerActor))
+		{
+			OwnerCharacterMeshComp = Character->GetMesh();
+		}
+
+		if (!OwnerCharacterMeshComp)
+		{
+			OwnerCharacterMeshComp = OwnerActor->FindComponentByClass<USkeletalMeshComponent>();
+		}
+	}
+
+	return OwnerCharacterMeshComp;
 }
 
 UCapsuleComponent* UMeleeTraceComponent::GetOwnerCapsuleComponent()
@@ -442,12 +462,37 @@ void UMeleeTraceComponent::ResetHitStop()
 
 void UMeleeTraceComponent::StartTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets)
 {
-	// 【核心改动】：在这里进行懒加载。如果之前没获取过，这里会顺着接口去找。找过了就直接返回缓存。
-	USkeletalMeshComponent* WeaponMesh = GetWeaponMesh();
+	StartSocketTrace(InBaseSocket, InTraceSockets, EMHWTraceMode::WeaponSockets);
+}
 
-	// 如果武器没拿到，或者没配插槽，直接退出
-	if (!WeaponMesh || InTraceSockets.Num() == 0 || InBaseSocket.IsNone()) return;
-	
+void UMeleeTraceComponent::StartBodySocketTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets)
+{
+	StartSocketTrace(InBaseSocket, InTraceSockets, EMHWTraceMode::BodySockets);
+}
+
+void UMeleeTraceComponent::StartSocketTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets, EMHWTraceMode TraceMode)
+{
+	USkeletalMeshComponent* TraceMesh = nullptr;
+	switch (TraceMode)
+	{
+	case EMHWTraceMode::WeaponSockets:
+		TraceMesh = GetWeaponMesh();
+		break;
+
+	case EMHWTraceMode::BodySockets:
+		GetWeaponMesh();
+		TraceMesh = GetOwnerCharacterMesh();
+		break;
+
+	default:
+		return;
+	}
+
+	if (!TraceMesh || InTraceSockets.Num() == 0 || InBaseSocket.IsNone())
+	{
+		return;
+	}
+
 	if (!CurrentHitstopData && CachedEquipmentInstance)
 	{
 		CurrentHitstopData = CachedEquipmentInstance->GetHitStopData();
@@ -456,23 +501,21 @@ void UMeleeTraceComponent::StartTrace(FName InBaseSocket, const TArray<FName>& I
 
 	BaseSocketName = InBaseSocket;
 	ActiveTraceSockets = InTraceSockets;
+	ActiveTraceMeshComp = TraceMesh;
 	HitActors.Empty();
 	TraceSocketsLocalOffsets.Empty();
+	PreviousBaseTransform = TraceMesh->GetSocketTransform(BaseSocketName);
 
-	// 获取武器基底的第一帧世界 Transform
-	PreviousBaseTransform = WeaponMesh->GetSocketTransform(BaseSocketName);
-
-	// 预计算局部坐标
 	for (const FName& SocketName : ActiveTraceSockets)
 	{
-		FVector WorldLoc = WeaponMesh->GetSocketLocation(SocketName);
-		FVector LocalLoc = PreviousBaseTransform.InverseTransformPosition(WorldLoc);
+		const FVector WorldLoc = TraceMesh->GetSocketLocation(SocketName);
+		const FVector LocalLoc = PreviousBaseTransform.InverseTransformPosition(WorldLoc);
 		TraceSocketsLocalOffsets.Add(LocalLoc);
 	}
 
-	CurrentTraceMode = EMHWTraceMode::WeaponSockets;
+	CurrentTraceMode = TraceMode;
 	bIsTracing = true;
-	SetComponentTickEnabled(true); 
+	SetComponentTickEnabled(true);
 }
 
 void UMeleeTraceComponent::StartCharacterCollisionTrace()
@@ -495,8 +538,9 @@ void UMeleeTraceComponent::StartCharacterCollisionTrace()
 	ActiveTraceSockets.Empty();
 	BaseSocketName = NAME_None;
 	PreviousOwnerCapsuleTransform = CapsuleComponent->GetComponentTransform();
+	ActiveTraceMeshComp = nullptr;
 
-	CurrentTraceMode = EMHWTraceMode::OwnerCapsule;
+	CurrentTraceMode = EMHWTraceMode::SweepCapsule;
 	bIsTracing = true;
 	SetComponentTickEnabled(true);
 }
@@ -630,6 +674,7 @@ void UMeleeTraceComponent::StopTrace()
 	TraceSocketsLocalOffsets.Empty();
 	ActiveTraceSockets.Empty();
 	BaseSocketName = NAME_None;
+	ActiveTraceMeshComp = nullptr;
 	CurrentTraceMode = EMHWTraceMode::WeaponSockets;
 	if (!IsHitstopActive())
 	{
@@ -667,9 +712,6 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	int32 NumSteps = FMath::CeilToInt(DeltaTime / SubstepInterval);
 	NumSteps = FMath::Clamp(NumSteps, 1, 4); 
 
-	// ====== 获取当前帧武器基底的 Transform ======
-	FTransform CurrentBaseTransform = OwnerMeshComp->GetSocketTransform(BaseSocketName);
-
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(GetOwner());
 	if (CachedEquipmentInstance)
@@ -681,7 +723,7 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	}
 	QueryParams.bTraceComplex = false; 
 
-	if (CurrentTraceMode == EMHWTraceMode::OwnerCapsule)
+	if (CurrentTraceMode == EMHWTraceMode::SweepCapsule)
 	{
 		UCapsuleComponent* CapsuleComponent = GetOwnerCapsuleComponent();
 		if (!CapsuleComponent)
@@ -742,13 +784,14 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 		return;
 	}
 
-	// 此时 OwnerMeshComp 必定是有效的（在 StartTrace 里拦截过了）
-	if (!OwnerMeshComp)
+	USkeletalMeshComponent* TraceMesh = ActiveTraceMeshComp;
+	if (!TraceMesh)
 	{
 		return;
 	}
 
-	// ====== 基于 Transform 曲线插值的纯射线判定网编织 ======
+	const FTransform CurrentBaseTransform = TraceMesh->GetSocketTransform(BaseSocketName);
+
 	for (int32 Step = 1; Step <= NumSteps; ++Step)
 	{
 		float AlphaPrev = (float)(Step - 1) / (float)NumSteps;

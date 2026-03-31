@@ -60,6 +60,9 @@ public:
 	void StartTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets);
 
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace")
+	void StartBodySocketTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets);
+
+	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace")
 	void StartCharacterCollisionTrace();
 
 	UFUNCTION(BlueprintCallable, Category = "Hitbox Trace")
@@ -103,7 +106,8 @@ private:
 	enum class EMHWTraceMode : uint8
 	{
 		WeaponSockets,
-		OwnerCapsule
+		BodySockets,
+		SweepCapsule
 	};
 
 	enum class EHitstopRuntimePhase : uint8
@@ -115,13 +119,21 @@ private:
 
 	// 【新增】：动态获取并缓存武器 Mesh
 	USkeletalMeshComponent* GetWeaponMesh();
+	USkeletalMeshComponent* GetOwnerCharacterMesh();
 	UCapsuleComponent* GetOwnerCapsuleComponent();
+	void StartSocketTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets, EMHWTraceMode TraceMode);
 	void HandleHitResult(const FHitResult& Hit);
 
 	bool bIsTracing = false;
 
 	UPROPERTY()
-	USkeletalMeshComponent* OwnerMeshComp;
+	USkeletalMeshComponent* WeaponMeshComp = nullptr;
+
+	UPROPERTY()
+	USkeletalMeshComponent* OwnerCharacterMeshComp = nullptr;
+
+	UPROPERTY()
+	USkeletalMeshComponent* ActiveTraceMeshComp = nullptr;
 
 	UPROPERTY()
 	UCapsuleComponent* OwnerCapsuleComp = nullptr;

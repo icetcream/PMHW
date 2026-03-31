@@ -8,10 +8,17 @@
 #include "MHWAttackComponent.generated.h"
 
 class AActor;
-class UCapsuleComponent;
 class UMHWHitStopData;
 class UMeleeTraceComponent;
 struct FHitResult;
+
+UENUM(BlueprintType)
+enum class EMHWAttackTraceMode : uint8
+{
+	Weapon,
+	SweepCapsule,
+	BodySocket
+};
 
 UENUM(BlueprintType)
 enum class EMHWChargeLevel : uint8
@@ -90,17 +97,14 @@ struct PMHW_API FMHWAttackWindowSpec
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack", meta = (DisplayName = "结束时完成攻击"))
 	bool bFinishAttackOnEnd = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack|Trace Override")
+	EMHWAttackTraceMode TraceMode = EMHWAttackTraceMode::Weapon;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack|Trace Override", meta = (DisplayName = "覆盖基准 Socket", ToolTip = "可选覆盖。不填写时使用当前武器 EquipmentDefinition 中的默认 BaseSocket。"))
 	FName BaseSocket = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack|Trace Override", meta = (DisplayName = "覆盖追踪 Sockets", ToolTip = "可选覆盖。不填写时使用当前武器 EquipmentDefinition 中的默认 TraceSockets。"))
 	TArray<FName> TraceSockets;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack|Trace Override")
-	bool bUseOwnerCapsuleCollisionDamage = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack|Trace Override", meta = (EditCondition = "bUseOwnerCapsuleCollisionDamage", EditConditionHides))
-	TEnumAsByte<ECollisionChannel> OwnerCapsuleCollisionResponseChannel = ECC_GameTraceChannel1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MHW|Attack", meta = (DisplayName = "攻击规格标签", ToolTip = "从当前武器的攻击数据表中查找这一段攻击的动作数据。", Categories = "Data.AttackSpec"))
 	FGameplayTag AttackSpecTag;
@@ -180,8 +184,6 @@ public:
 private:
 	bool TryInitializeFromOwner();
 	void StopTraceAndClearDamageSpec();
-	void ApplyOwnerCapsuleCollisionResponseOverride(const FMHWAttackWindowSpec& WindowSpec);
-	void RestoreOwnerCapsuleCollisionResponse();
 	FMHWPhysicalDamageSpec BuildDamageSpecForWindow(const FMHWAttackWindowSpec& WindowSpec) const;
 	void ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FGameplayTag& ResolvedAttackSpecTag, const FMHWPhysicalDamageSpec& ResolvedDamageSpec);
 	int32 ResolveBonusCheckWindowIndex(const FMHWAttackWindowSpec& WindowSpec) const;
@@ -210,13 +212,4 @@ private:
 
 	UPROPERTY(Transient)
 	FGameplayTag ActiveAttackSpecTagOverride;
-
-	UPROPERTY(Transient)
-	TEnumAsByte<ECollisionResponse> PreviousOwnerCapsuleCollisionResponse = ECR_Ignore;
-
-	UPROPERTY(Transient)
-	TEnumAsByte<ECollisionChannel> PreviousOwnerCapsuleCollisionResponseChannel = ECC_GameTraceChannel1;
-
-	UPROPERTY(Transient)
-	bool bHasPreviousOwnerCapsuleCollisionResponse = false;
 };
