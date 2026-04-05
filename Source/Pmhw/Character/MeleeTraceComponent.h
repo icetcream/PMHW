@@ -28,6 +28,7 @@ public:
 
 public:	
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	// ======================== 核心配置参数 ========================
 	
@@ -150,7 +151,7 @@ private:
 	TArray<TWeakObjectPtr<AActor>> HitActors;
 	
 	UPROPERTY()
-	UMHWEquipmentInstance* CachedEquipmentInstance;
+	UMHWEquipmentInstance* CachedEquipmentInstance = nullptr;
 
 	// 自适应补帧常量
 	const float MIN_FPS = 60.0f;
@@ -177,9 +178,13 @@ private:
 	void SpawnHitVFX(const FHitResult& HitResult) const;
 	// 强制结束卡肉并清理状态
 	void ResetHitStop();
+	void ResetTraceRuntimeState();
+	void ResetOwnerMontageHitstopState();
+	void EnsureDefaultHitStopConfigFromEquipment();
+	void RefreshTickEnabledState();
 
 	// 当前缓存的卡肉数据指针 (从 Instance 获取)
-	const UMHWHitStopData* CurrentHitstopData;
+	const UMHWHitStopData* CurrentHitstopData = nullptr;
 
 	float CurrentHitstopStrengthMultiplier = 1.0f;
 

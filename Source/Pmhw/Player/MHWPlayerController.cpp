@@ -44,6 +44,7 @@ UAbilitySystemComponent* AMHWPlayerController::GetAbilitySystemComponent() const
 		if (PS)
 		{
 			AbilitySystemComponent = PS->GetAbilitySystemComponent();
+			ASC = AbilitySystemComponent.Get();
 		}
 	}
 	return ASC;
@@ -59,9 +60,7 @@ void AMHWPlayerController::PlayCombatCameraSpringShake(const FMHWCameraSpringSha
 
 void AMHWPlayerController::ApplyCombatCameraMotion(const FMHWCombatCameraArmMotionSettings& InMotionSettings)
 {
-	APawn* ControlledPawn = GetPawn();
-	UMHWCombatCameraComponent* CameraComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UMHWCombatCameraComponent>() : nullptr;
-	if (CameraComponent)
+	if (UMHWCombatCameraComponent* CameraComponent = GetCombatCameraComponent())
 	{
 		CameraComponent->ApplyCameraMotion(InMotionSettings);
 	}
@@ -69,19 +68,27 @@ void AMHWPlayerController::ApplyCombatCameraMotion(const FMHWCombatCameraArmMoti
 
 bool AMHWPlayerController::ApplyCombatCameraMotionByTag(const FGameplayTag& CameraMotionTag)
 {
-	APawn* ControlledPawn = GetPawn();
-	UMHWCombatCameraComponent* CameraComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UMHWCombatCameraComponent>() : nullptr;
+	UMHWCombatCameraComponent* CameraComponent = GetCombatCameraComponent();
 	return CameraComponent ? CameraComponent->ApplyCameraMotionByTag(CameraMotionTag) : false;
 }
 
 void AMHWPlayerController::ClearCombatCameraMotion(const float BlendOutDuration)
 {
-	APawn* ControlledPawn = GetPawn();
-	UMHWCombatCameraComponent* CameraComponent = ControlledPawn ? ControlledPawn->FindComponentByClass<UMHWCombatCameraComponent>() : nullptr;
-	if (CameraComponent)
+	if (UMHWCombatCameraComponent* CameraComponent = GetCombatCameraComponent())
 	{
 		CameraComponent->ClearCameraMotion(BlendOutDuration);
 	}
+}
+
+UMHWCombatCameraComponent* AMHWPlayerController::GetCombatCameraComponent() const
+{
+	APawn* ControlledPawn = GetPawn();
+	return ControlledPawn ? ControlledPawn->FindComponentByClass<UMHWCombatCameraComponent>() : nullptr;
+}
+
+UMHWCombatComponent* AMHWPlayerController::GetCombatComponent(APawn* InPawn) const
+{
+	return InPawn ? InPawn->FindComponentByClass<UMHWCombatComponent>() : nullptr;
 }
 
 void AMHWPlayerController::TryInitOverlay(APawn* InPawn)
@@ -91,9 +98,10 @@ void AMHWPlayerController::TryInitOverlay(APawn* InPawn)
 		return;
 	}
 
+	// The overlay only exists for the local player and depends on both player-state and pawn combat data.
 	AMHWHUD* MHWHUD = GetHUD<AMHWHUD>();
 	AMHWPlayerState* PS = GetPlayerState<AMHWPlayerState>();
-	UMHWCombatComponent* CombatComponent = InPawn ? InPawn->FindComponentByClass<UMHWCombatComponent>() : nullptr;
+	UMHWCombatComponent* CombatComponent = GetCombatComponent(InPawn);
 	if (!MHWHUD || !PS || !CombatComponent)
 	{
 		return;
@@ -129,5 +137,4 @@ UMHWCombatCameraModifier* AMHWPlayerController::GetOrCreateCombatCameraModifier(
 	CombatCameraModifier = Cast<UMHWCombatCameraModifier>(NewModifier);
 	return CombatCameraModifier.Get();
 }
-
 

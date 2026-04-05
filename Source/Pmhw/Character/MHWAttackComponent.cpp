@@ -40,7 +40,7 @@ void UMHWAttackComponent::BeginAttack(FName InAttackId)
 void UMHWAttackComponent::EndAttack()
 {
 	StopTraceAndClearDamageSpec();
-	ActiveWindowSpec = FMHWAttackWindowSpec();
+	ResetActiveWindowState();
 	AttackRuntimeContext.Reset();
 	ClearActiveAttackSpecTagOverride();
 }
@@ -52,94 +52,45 @@ bool UMHWAttackComponent::BeginAttackWindow(const FMHWAttackWindowSpec& WindowSp
 		return false;
 	}
 
-	if (WindowSpec.bStartNewAttack || !AttackRuntimeContext.bAttackActive || AttackRuntimeContext.ActiveAttackId != WindowSpec.AttackId)
+	const bool bShouldStartNewAttack =
+		WindowSpec.bStartNewAttack ||
+		!AttackRuntimeContext.bAttackActive ||
+		AttackRuntimeContext.ActiveAttackId != WindowSpec.AttackId;
+	const bool bHadActiveWindow = AttackRuntimeContext.bWindowActive;
+
+	FName ResolvedBaseSocket = NAME_None;
+	TArray<FName> ResolvedTraceSockets;
+	if (!ResolveWindowTraceConfiguration(WindowSpec, ResolvedBaseSocket, ResolvedTraceSockets))
 	{
-		BeginAttack(WindowSpec.AttackId);
+		return false;
 	}
 
-	if (AttackRuntimeContext.bWindowActive)
+	if (bHadActiveWindow)
 	{
 		StopTraceAndClearDamageSpec();
 	}
 
-	AttackRuntimeContext.CurrentWindowIndex = WindowSpec.WindowIndex;
-	AttackRuntimeContext.bWindowActive = true;
-	AttackRuntimeContext.bCurrentWindowHit = false;
-	ActiveWindowSpec = WindowSpec;
-
-	FName ResolvedBaseSocket = NAME_None;
-	TArray<FName> ResolvedTraceSockets;
-	switch (WindowSpec.TraceMode)
+	if (bShouldStartNewAttack)
 	{
-	case EMHWAttackTraceMode::Weapon:
-		if (!CachedMeleeTraceComponent->ResolveTraceConfig(WindowSpec.BaseSocket, WindowSpec.TraceSockets, ResolvedBaseSocket, ResolvedTraceSockets))
-		{
-			return false;
-		}
-		break;
-
-	case EMHWAttackTraceMode::BodySocket:
-		ResolvedBaseSocket = WindowSpec.BaseSocket;
-		ResolvedTraceSockets = WindowSpec.TraceSockets;
-		if (ResolvedBaseSocket.IsNone() || ResolvedTraceSockets.IsEmpty())
-		{
-			return false;
-		}
-		break;
-
-	case EMHWAttackTraceMode::SweepCapsule:
-		break;
-
-	default:
-		return false;
+		BeginAttack(WindowSpec.AttackId);
 	}
 
 	const FGameplayTag ResolvedAttackSpecTag = ResolveAttackSpecTagForCurrentAction(WindowSpec.AttackSpecTag);
 	const FMHWPhysicalDamageSpec ResolvedDamageSpec = BuildDamageSpecForWindow(WindowSpec);
 
-	CachedMeleeTraceComponent->SetCachedPhysicalDamageSpec(ResolvedDamageSpec);
-	if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(ResolvedAttackSpecTag))
-	{
-		CachedMeleeTraceComponent->SetCachedHitCameraShake(AttackDataRow->HitCameraShake);
-		if (!AttackDataRow->AttackDisplayName.IsEmpty())
-		{
-			CachedMeleeTraceComponent->SetCachedAttackDisplayName(AttackDataRow->AttackDisplayName);
-		}
-		else
-		{
-			CachedMeleeTraceComponent->SetCachedAttackDisplayName(FText::FromString(ResolvedAttackSpecTag.ToString()));
-		}
-	}
-	else
-	{
-		CachedMeleeTraceComponent->ClearCachedHitCameraShake();
-		if (ResolvedAttackSpecTag.IsValid())
-		{
-			CachedMeleeTraceComponent->SetCachedAttackDisplayName(FText::FromString(ResolvedAttackSpecTag.ToString()));
-		}
-		else
-		{
-			CachedMeleeTraceComponent->ClearCachedAttackDisplayName();
-		}
-	}
-	CachedMeleeTraceComponent->SetHitVFXSpec(WindowSpec.HitVFX);
+	// Keep runtime state untouched until trace validation succeeds, so failed windows do not leave stale active flags behind.
+	AttackRuntimeContext.CurrentWindowIndex = WindowSpec.WindowIndex;
+	AttackRuntimeContext.bWindowActive = true;
+	AttackRuntimeContext.bCurrentWindowHit = false;
+	ActiveWindowSpec = WindowSpec;
+
+	ApplyWindowTracePresentation(WindowSpec, ResolvedAttackSpecTag, ResolvedDamageSpec);
 	ConfigureHitstopForWindow(WindowSpec, ResolvedAttackSpecTag, ResolvedDamageSpec);
 
-	switch (WindowSpec.TraceMode)
+	if (!StartResolvedTrace(WindowSpec, ResolvedBaseSocket, ResolvedTraceSockets))
 	{
-	case EMHWAttackTraceMode::SweepCapsule:
-		CachedMeleeTraceComponent->StartCharacterCollisionTrace();
-		break;
-
-	case EMHWAttackTraceMode::BodySocket:
-		CachedMeleeTraceComponent->StartBodySocketTrace(ResolvedBaseSocket, ResolvedTraceSockets);
-		break;
-
-	case EMHWAttackTraceMode::Weapon:
-		CachedMeleeTraceComponent->StartTrace(ResolvedBaseSocket, ResolvedTraceSockets);
-		break;
-
-	default:
+		StopTraceAndClearDamageSpec();
+		ResetActiveWindowState();
 		return false;
 	}
 
@@ -151,14 +102,12 @@ void UMHWAttackComponent::EndAttackWindow()
 	const bool bFinishAttackOnEnd = ActiveWindowSpec.bFinishAttackOnEnd;
 
 	StopTraceAndClearDamageSpec();
-	AttackRuntimeContext.CurrentWindowIndex = INDEX_NONE;
-	AttackRuntimeContext.bWindowActive = false;
-	AttackRuntimeContext.bCurrentWindowHit = false;
-	ActiveWindowSpec = FMHWAttackWindowSpec();
+	ResetActiveWindowState();
 
 	if (bFinishAttackOnEnd)
 	{
-		EndAttack();
+		AttackRuntimeContext.Reset();
+		ClearActiveAttackSpecTagOverride();
 	}
 }
 
@@ -256,6 +205,14 @@ bool UMHWAttackComponent::TryInitializeFromOwner()
 	return true;
 }
 
+void UMHWAttackComponent::ResetActiveWindowState()
+{
+	AttackRuntimeContext.CurrentWindowIndex = INDEX_NONE;
+	AttackRuntimeContext.bWindowActive = false;
+	AttackRuntimeContext.bCurrentWindowHit = false;
+	ActiveWindowSpec = FMHWAttackWindowSpec();
+}
+
 void UMHWAttackComponent::StopTraceAndClearDamageSpec()
 {
 	if (!TryInitializeFromOwner() || !CachedMeleeTraceComponent)
@@ -269,6 +226,96 @@ void UMHWAttackComponent::StopTraceAndClearDamageSpec()
 	CachedMeleeTraceComponent->ClearCachedHitCameraShake();
 	CachedMeleeTraceComponent->ClearHitVFXSpec();
 	CachedMeleeTraceComponent->ClearHitStopConfig();
+}
+
+bool UMHWAttackComponent::ResolveWindowTraceConfiguration(
+	const FMHWAttackWindowSpec& WindowSpec,
+	FName& OutBaseSocket,
+	TArray<FName>& OutTraceSockets) const
+{
+	OutBaseSocket = NAME_None;
+	OutTraceSockets.Reset();
+
+	switch (WindowSpec.TraceMode)
+	{
+	case EMHWAttackTraceMode::Weapon:
+		return CachedMeleeTraceComponent &&
+			CachedMeleeTraceComponent->ResolveTraceConfig(WindowSpec.BaseSocket, WindowSpec.TraceSockets, OutBaseSocket, OutTraceSockets);
+
+	case EMHWAttackTraceMode::BodySocket:
+		OutBaseSocket = WindowSpec.BaseSocket;
+		OutTraceSockets = WindowSpec.TraceSockets;
+		return !OutBaseSocket.IsNone() && !OutTraceSockets.IsEmpty();
+
+	case EMHWAttackTraceMode::SweepCapsule:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+void UMHWAttackComponent::ApplyWindowTracePresentation(
+	const FMHWAttackWindowSpec& WindowSpec,
+	const FGameplayTag& ResolvedAttackSpecTag,
+	const FMHWPhysicalDamageSpec& ResolvedDamageSpec)
+{
+	if (!CachedMeleeTraceComponent)
+	{
+		return;
+	}
+
+	CachedMeleeTraceComponent->SetCachedPhysicalDamageSpec(ResolvedDamageSpec);
+	CachedMeleeTraceComponent->SetHitVFXSpec(WindowSpec.HitVFX);
+
+	if (const FMHWAttackDataRow* AttackDataRow = CachedMeleeTraceComponent->FindAttackDataRowBySpecTag(ResolvedAttackSpecTag))
+	{
+		CachedMeleeTraceComponent->SetCachedHitCameraShake(AttackDataRow->HitCameraShake);
+		CachedMeleeTraceComponent->SetCachedAttackDisplayName(
+			!AttackDataRow->AttackDisplayName.IsEmpty()
+				? AttackDataRow->AttackDisplayName
+				: FText::FromString(ResolvedAttackSpecTag.ToString()));
+		return;
+	}
+
+	CachedMeleeTraceComponent->ClearCachedHitCameraShake();
+	if (ResolvedAttackSpecTag.IsValid())
+	{
+		CachedMeleeTraceComponent->SetCachedAttackDisplayName(FText::FromString(ResolvedAttackSpecTag.ToString()));
+	}
+	else
+	{
+		CachedMeleeTraceComponent->ClearCachedAttackDisplayName();
+	}
+}
+
+bool UMHWAttackComponent::StartResolvedTrace(
+	const FMHWAttackWindowSpec& WindowSpec,
+	const FName& ResolvedBaseSocket,
+	const TArray<FName>& ResolvedTraceSockets)
+{
+	if (!CachedMeleeTraceComponent)
+	{
+		return false;
+	}
+
+	switch (WindowSpec.TraceMode)
+	{
+	case EMHWAttackTraceMode::SweepCapsule:
+		CachedMeleeTraceComponent->StartCharacterCollisionTrace();
+		return true;
+
+	case EMHWAttackTraceMode::BodySocket:
+		CachedMeleeTraceComponent->StartBodySocketTrace(ResolvedBaseSocket, ResolvedTraceSockets);
+		return true;
+
+	case EMHWAttackTraceMode::Weapon:
+		CachedMeleeTraceComponent->StartTrace(ResolvedBaseSocket, ResolvedTraceSockets);
+		return true;
+
+	default:
+		return false;
+	}
 }
 
 FMHWPhysicalDamageSpec UMHWAttackComponent::BuildDamageSpecForWindow(const FMHWAttackWindowSpec& WindowSpec) const

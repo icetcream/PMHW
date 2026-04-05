@@ -9,6 +9,66 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatBlueprintLibrary)
 
+namespace CombatBlueprintLibrary
+{
+	static UMHWCombatComponent* GetCombatComponent(AActor* Actor)
+	{
+		return Actor ? Actor->FindComponentByClass<UMHWCombatComponent>() : nullptr;
+	}
+
+	static FMHWGameplayEffectContext* GetMHWEffectContext(FGameplayEffectContextHandle& EffectContext)
+	{
+		FGameplayEffectContext* RawEffectContext = EffectContext.Get();
+		if (!RawEffectContext || RawEffectContext->GetScriptStruct() != FMHWGameplayEffectContext::StaticStruct())
+		{
+			return nullptr;
+		}
+
+		return static_cast<FMHWGameplayEffectContext*>(RawEffectContext);
+	}
+
+	static void ApplyOptionalDamageMetadata(
+		FGameplayEffectContextHandle& EffectContext,
+		const bool bHasDamageNumberWorldLocation,
+		const FVector& DamageNumberWorldLocation,
+		const FString& AttackDisplayName)
+	{
+		FMHWGameplayEffectContext* CombatEffectContext = GetMHWEffectContext(EffectContext);
+		if (!CombatEffectContext)
+		{
+			return;
+		}
+
+		if (bHasDamageNumberWorldLocation)
+		{
+			CombatEffectContext->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
+		}
+
+		if (!AttackDisplayName.IsEmpty())
+		{
+			CombatEffectContext->SetAttackDisplayName(AttackDisplayName);
+		}
+	}
+
+	static void SetDamageSpecMagnitudes(FGameplayEffectSpec& GameplayEffectSpec, const FMHWPhysicalDamageSpec& DamageSpec)
+	{
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::TrueRawAttack, DamageSpec.TrueRawAttack);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, DamageSpec.MotionValue);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, DamageSpec.MotionValueScale);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, DamageSpec.SharpnessMultiplier);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, DamageSpec.CriticalChance);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, DamageSpec.PositiveCriticalMultiplier);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, DamageSpec.NegativeCriticalMultiplier);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, DamageSpec.CriticalMultiplierOverride);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::BounceMultiplier, DamageSpec.BounceMultiplier);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::EnrageMultiplier, DamageSpec.EnrageMultiplier);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::AilmentMultiplier, DamageSpec.AilmentMultiplier);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::DefenseRate, DamageSpec.DefenseRate);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::HitzoneValue, DamageSpec.HitzoneValue);
+		GameplayEffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::AdditionalMultiplier, DamageSpec.AdditionalMultiplier);
+	}
+}
+
 bool UMHWCombatBlueprintLibrary::ApplyRawDamageToActor(AActor* TargetActor, float DamageAmount)
 {
 	FMHWPhysicalDamageSpec DamageSpec;
@@ -23,7 +83,7 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 		return false;
 	}
 
-	if (UMHWCombatComponent* CombatComponent = TargetActor->FindComponentByClass<UMHWCombatComponent>())
+	if (UMHWCombatComponent* CombatComponent = CombatBlueprintLibrary::GetCombatComponent(TargetActor))
 	{
 		return CombatComponent->ApplyPhysicalDamage(SourceActor, DamageSpec, bHasDamageNumberWorldLocation, DamageNumberWorldLocation, AttackDisplayName);
 	}
@@ -45,27 +105,11 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 		EffectContext.AddSourceObject(SourceActor);
 	}
 
-	if (bHasDamageNumberWorldLocation)
-	{
-		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
-		{
-			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
-			{
-				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
-			}
-		}
-	}
-
-	if (!AttackDisplayName.IsEmpty())
-	{
-		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
-		{
-			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
-			{
-				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetAttackDisplayName(AttackDisplayName);
-			}
-		}
-	}
+	CombatBlueprintLibrary::ApplyOptionalDamageMetadata(
+		EffectContext,
+		bHasDamageNumberWorldLocation,
+		DamageNumberWorldLocation,
+		AttackDisplayName);
 
 	FGameplayEffectSpecHandle SpecHandle = SpecSourceASC->MakeOutgoingSpec(UMHWDamageGameplayEffect::StaticClass(), 1.0f, EffectContext);
 	if (!SpecHandle.IsValid())
@@ -79,20 +123,7 @@ bool UMHWCombatBlueprintLibrary::ApplyPhysicalDamageToActor(AActor* TargetActor,
 		return false;
 	}
 
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::TrueRawAttack, DamageSpec.TrueRawAttack);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, DamageSpec.MotionValue);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, DamageSpec.MotionValueScale);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, DamageSpec.SharpnessMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, DamageSpec.CriticalChance);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, DamageSpec.PositiveCriticalMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, DamageSpec.NegativeCriticalMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, DamageSpec.CriticalMultiplierOverride);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::BounceMultiplier, DamageSpec.BounceMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::EnrageMultiplier, DamageSpec.EnrageMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::AilmentMultiplier, DamageSpec.AilmentMultiplier);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::DefenseRate, DamageSpec.DefenseRate);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::HitzoneValue, DamageSpec.HitzoneValue);
-	GameplayEffectSpec->SetSetByCallerMagnitude(MHWDamageDataTags::AdditionalMultiplier, DamageSpec.AdditionalMultiplier);
+	CombatBlueprintLibrary::SetDamageSpecMagnitudes(*GameplayEffectSpec, DamageSpec);
 
 	TargetASC->ApplyGameplayEffectSpecToSelf(*GameplayEffectSpec);
 	return true;

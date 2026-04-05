@@ -4,14 +4,11 @@
 
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
-#include "EnhancedInputSubsystemInterface.h"
 #include "EnhancedInputSubsystems.h"
-#include "MHWGameplayTags.h"
 #include "Character/MHWCharacter.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "Equipment/MHWEquipmentInstance.h"
 #include "Player/MHWLocalPlayer.h"
-#include "Player/MHWPlayerState.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentManagerComponent)
 
@@ -35,13 +32,37 @@ UMHWAbilitySystemComponent* FMHWEquipmentList::GetAbilitySystemComponent() const
 	return Cast<UMHWAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor));
 }
 
-APawn* FMHWEquipmentList::GetPawn()
+APawn* FMHWEquipmentList::GetPawn() const
 {
-	if (OwnerComponent)
+	return OwnerComponent ? Cast<APawn>(OwnerComponent->GetOwner()) : nullptr;
+}
+
+void FMHWEquipmentList::AddInputMappingContext(const UMHWEquipmentDefinition* EquipmentCDO)
+{
+	if (!EquipmentCDO || !EquipmentCDO->InputMappingContext)
 	{
-		return Cast<APawn>(OwnerComponent->GetOuter());
+		return;
 	}
-	return nullptr;
+
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem())
+	{
+		FModifyContextOptions Options;
+		Options.bIgnoreAllPressedKeysUntilRelease = false;
+		Subsystem->AddMappingContext(EquipmentCDO->InputMappingContext, WEAPON_PRIORITY, Options);
+	}
+}
+
+void FMHWEquipmentList::RemoveInputMappingContext(const UMHWEquipmentDefinition* EquipmentCDO)
+{
+	if (!EquipmentCDO || !EquipmentCDO->InputMappingContext)
+	{
+		return;
+	}
+
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem())
+	{
+		Subsystem->RemoveMappingContext(EquipmentCDO->InputMappingContext);
+	}
 }
 
 UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefinition> EquipmentDefinition)
@@ -64,10 +85,13 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 	NewEntry.EquipmentDefinition = EquipmentDefinition;
 	NewEntry.Instance = NewObject<UMHWEquipmentInstance>(OwnerComponent->GetOwner(), InstanceType);  //@TODO: Using the actor instead of component as the outer due to UE-127172
 	Result = NewEntry.Instance;
-	if (Result)
+	if (!Result)
 	{
-		Result->SetEquipmentDefinition(EquipmentDefinition);
+		Entries.RemoveAt(Entries.Num() - 1);
+		return nullptr;
 	}
+
+	Result->SetEquipmentDefinition(EquipmentDefinition);
 
 	if (AMHWCharacter* Character = Cast<AMHWCharacter>(GetPawn()))
 	{
@@ -82,29 +106,25 @@ UMHWEquipmentInstance* FMHWEquipmentList::AddEntry(TSubclassOf<UMHWEquipmentDefi
 				Character->AddOrUpdateMovementSettingsForWeaponState(NewEntry.AppliedWeaponStateTag, EquipmentCDO->MovementSettingsToAdd);
 		}
 	}
-	
-	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem();
-	
-	if (UInputMappingContext* IMC = EquipmentCDO->InputMappingContext)
-	{
-		FModifyContextOptions Options = {};
-		Options.bIgnoreAllPressedKeysUntilRelease = false;
-		// Actually add the config to the local player							
-		Subsystem->AddMappingContext(IMC, WEAPON_PRIORITY, Options);
-	}
+
+	// Input mappings are only meaningful for locally controlled pawns. Server-only or AI-owned
+	// equipment can still grant actors/abilities without requiring a local player subsystem.
+	AddInputMappingContext(EquipmentCDO);
 
 	if (UMHWAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 	{
 		for (const TObjectPtr<const UMHWAbilitySet>& AbilitySet : EquipmentCDO->AbilitySetsToGrant)
 		{
-			AbilitySet->GiveToAbilitySystem(ASC, /*inout*/ &NewEntry.GrantedHandles, Result);
+			if (AbilitySet)
+			{
+				AbilitySet->GiveToAbilitySystem(ASC, /*inout*/ &NewEntry.GrantedHandles, Result);
+			}
 		}
 	}
 	else
 	{
 		//@TODO: Warning logging?
 	}
-
 	Result->SpawnEquipmentActors(EquipmentCDO->ActorsToSpawn);
 	return Result;
 }
@@ -115,16 +135,12 @@ void FMHWEquipmentList::RemoveEntry(UMHWEquipmentInstance* Instance)
 	for (auto EntryIt = Entries.CreateIterator(); EntryIt; ++EntryIt)
 	{
 		FMHWAppliedEquipmentEntry& Entry = *EntryIt;
-		const UMHWEquipmentDefinition* EquipmentCDO = GetDefault<UMHWEquipmentDefinition>(Entry.EquipmentDefinition);
-
-		UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSystem();
-	
-		if (UInputMappingContext* IMC = EquipmentCDO->InputMappingContext)
-		{
-			Subsystem->RemoveMappingContext(IMC);
-		}
 		if (Entry.Instance == Instance)
 		{
+			const UMHWEquipmentDefinition* EquipmentCDO = GetDefault<UMHWEquipmentDefinition>(Entry.EquipmentDefinition);
+
+			RemoveInputMappingContext(EquipmentCDO);
+
 			if (AMHWCharacter* Character = Cast<AMHWCharacter>(GetPawn()))
 			{
 				if (Entry.bAppliedMovementSettingsOnEquip && Entry.AppliedWeaponStateTag.IsValid())
@@ -147,19 +163,32 @@ void FMHWEquipmentList::RemoveEntry(UMHWEquipmentInstance* Instance)
 
 UEnhancedInputLocalPlayerSubsystem* FMHWEquipmentList::GetEnhancedInputSystem()
 {
-	if (EnhancedInputSubsystem == nullptr)
+	if (EnhancedInputSubsystem)
 	{
-		const APlayerController* PC = GetPawn()->GetController<APlayerController>();
-		check(PC);
-	
-		const UMHWLocalPlayer* LP = Cast<UMHWLocalPlayer>(PC->GetLocalPlayer());
-		check(LP);
-
-		UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
-		check(Subsystem);
-		EnhancedInputSubsystem = Subsystem;
+		return EnhancedInputSubsystem.Get();
 	}
-	return EnhancedInputSubsystem;
+
+	APawn* Pawn = GetPawn();
+	if (!Pawn)
+	{
+		return nullptr;
+	}
+
+	const APlayerController* PC = Pawn->GetController<APlayerController>();
+	if (!PC)
+	{
+		return nullptr;
+	}
+
+	const UMHWLocalPlayer* LP = Cast<UMHWLocalPlayer>(PC->GetLocalPlayer());
+	if (!LP)
+	{
+		return nullptr;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+	EnhancedInputSubsystem = Subsystem;
+	return EnhancedInputSubsystem.Get();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -314,5 +343,3 @@ void UMHWEquipmentManagerComponent::OnWeaponDrawnStateChanged(const FGameplayTag
 		CharacterMesh->UnlinkAnimClassLayers(WeaponAnimLayerClass);*/
 	}
 }
-
-

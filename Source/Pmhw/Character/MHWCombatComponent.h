@@ -9,6 +9,8 @@ class UAbilitySystemComponent;
 class UGameplayEffect;
 class UMHWCombatAttributeSet;
 class AMHWDamageNumberActor;
+struct FGameplayEffectContextHandle;
+struct FGameplayEffectSpec;
 struct FOnAttributeChangeData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FMHWAttributeChangedSignature, float, NewValue, float, MaxValue, float, DeltaValue);
@@ -26,6 +28,7 @@ public:
 	UMHWCombatComponent();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UFUNCTION(BlueprintPure, Category = "MHW|Combat")
@@ -134,7 +137,12 @@ private:
 	AMHWDamageNumberActor* AcquireDamageNumberActor();
 	AMHWDamageNumberActor* SpawnPooledDamageNumberActor();
 	void SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName);
+	void ApplyDamageContextMetadata(FGameplayEffectContextHandle& EffectContext, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName) const;
+	void ApplyDamageSpecSetByCallerMagnitudes(FGameplayEffectSpec& EffectSpec, const FMHWPhysicalDamageSpec& DamageSpec) const;
+	UAbilitySystemComponent* ResolveOwnerAbilitySystemComponent() const;
+	bool IsAbilitySystemReady(UAbilitySystemComponent* ASC) const;
 	bool TryInitializeFromOwner();
+	void UnbindAttributeDelegates();
 	void HandleAutomaticStaminaRegen(float DeltaSeconds);
 	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
 	void HandleStaminaAttributeChanged(const FOnAttributeChangeData& ChangeData);
@@ -145,6 +153,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilitySystemComponent> InitialAttributesAppliedASC;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAbilitySystemComponent> BoundAttributeDelegatesASC;
 
 	UPROPERTY(Transient)
 	bool bAttributeDelegatesBound = false;
@@ -169,4 +180,7 @@ private:
 
 	UPROPERTY(Transient)
 	bool bDamageNumberPoolInitialized = false;
+
+	FDelegateHandle HealthAttributeChangedHandle;
+	FDelegateHandle StaminaAttributeChangedHandle;
 };

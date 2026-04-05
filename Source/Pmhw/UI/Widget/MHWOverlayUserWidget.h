@@ -60,12 +60,40 @@ protected:
 	float StaminaBarRestoreInterpSpeed = 6.0f;
 
 private:
+	struct FOverlayBarAnimationSettings
+	{
+		bool bAnimateDecrease = true;
+		float DecreaseDelay = 0.0f;
+		float DecreaseInterpSpeed = 1.0f;
+		bool bSnapOnIncrease = true;
+		float IncreaseInterpSpeed = 1.0f;
+	};
+
+	struct FOverlayBarAnimationState
+	{
+		float CurrentDisplayedPercent = 1.0f;
+		float TargetPercent = 1.0f;
+		float RemainingDelay = 0.0f;
+		bool bInitialized = false;
+	};
+
+	FOverlayBarAnimationSettings MakeHealthBarAnimationSettings() const;
+	FOverlayBarAnimationSettings MakeStaminaBarAnimationSettings() const;
 	void InitializeDynamicMaterials();
 	void UnbindFromController();
-	void ApplyHealthBarPercent(float NewPercent);
-	void ApplyStaminaBarPercent(float NewPercent);
-	void UpdateAnimatedHealthBar(float DeltaTime);
-	void UpdateAnimatedStaminaBar(float DeltaTime);
+	void ApplyBarPercent(UImage* BarImage, TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance, float NewPercent);
+	void UpdateAnimatedBar(
+		float DeltaTime,
+		const FOverlayBarAnimationSettings& Settings,
+		FOverlayBarAnimationState& State,
+		UImage* BarImage,
+		TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance);
+	void HandleBarPercentChanged(
+		float NewPercent,
+		const FOverlayBarAnimationSettings& Settings,
+		FOverlayBarAnimationState& State,
+		UImage* BarImage,
+		TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance);
 
 	UFUNCTION()
 	void HandleHealthPercentChanged(float NewPercent);
@@ -82,27 +110,6 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMHWOverlayWidgetController> BoundOverlayWidgetController;
 
-	UPROPERTY(Transient)
-	float CurrentDisplayedHealthPercent = 1.0f;
-
-	UPROPERTY(Transient)
-	float TargetHealthPercent = 1.0f;
-
-	UPROPERTY(Transient)
-	float RemainingHealthDamageDelay = 0.0f;
-
-	UPROPERTY(Transient)
-	bool bHasInitializedHealthBar = false;
-
-	UPROPERTY(Transient)
-	float CurrentDisplayedStaminaPercent = 1.0f;
-
-	UPROPERTY(Transient)
-	float TargetStaminaPercent = 1.0f;
-
-	UPROPERTY(Transient)
-	float RemainingStaminaConsumeDelay = 0.0f;
-
-	UPROPERTY(Transient)
-	bool bHasInitializedStaminaBar = false;
+	FOverlayBarAnimationState HealthBarState;
+	FOverlayBarAnimationState StaminaBarState;
 };

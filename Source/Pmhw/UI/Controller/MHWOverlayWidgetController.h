@@ -42,6 +42,14 @@ public:
 	FMHWOnOverlayDeathSignature OnDeath;
 
 private:
+	void UnbindFromCombatComponent();
+	void BroadcastResourceChanged(
+		float NewValue,
+		float MaxValue,
+		FMHWOnFloatValueChangedSignature& OnValueChanged,
+		FMHWOnFloatValueChangedSignature& OnMaxValueChanged,
+		FMHWOnFloatValueChangedSignature& OnPercentChanged) const;
+
 	UFUNCTION()
 	void HandleHealthChanged(float NewValue, float MaxValue, float DeltaValue);
 

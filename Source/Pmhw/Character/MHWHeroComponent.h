@@ -48,6 +48,7 @@ public:
 protected:
 	// --- Actor Interface ---
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	// --- Actor Interface End---
 
 	// --- MHWPawnComponent ---
@@ -66,6 +67,7 @@ protected:
 	UMHWInputComponent* GetMHWInputComponent();
 	void BindAllObservedTagListeners();
 	void BindObservedTagListener(const FGameplayTag TagToObserve, FDelegateHandle& DelegateHandle, bool& bListenerBound);
+	void CleanupObservedTagListeners();
 	void ApplyObservedTagStates();
 	void OnObservedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 

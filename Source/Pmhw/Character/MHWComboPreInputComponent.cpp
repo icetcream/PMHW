@@ -29,6 +29,11 @@ void UMHWComboPreInputComponent::TickComponent(float DeltaTime, ELevelTick TickT
 
 void UMHWComboPreInputComponent::BufferInput(FGameplayTag InputTag, int32 Priority, float CustomLifespan)
 {
+	if (!InputTag.IsValid())
+	{
+		return;
+	}
+
 	// 判断是否允许覆盖：
 	// 1. 当前没有缓存 (TimeRemaining <= 0)
 	// 2. 或者新输入的优先级 >= 当前缓存的优先级 (使用 >= 可以让玩家连续狂按同一个键时刷新存活时间)

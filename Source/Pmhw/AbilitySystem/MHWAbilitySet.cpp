@@ -8,6 +8,19 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWAbilitySet)
 
+namespace AbilitySet
+{
+	static bool CanModifyAbilitySet(const UMHWAbilitySystemComponent* MHWASC)
+	{
+		return MHWASC && MHWASC->IsOwnerActorAuthoritative();
+	}
+
+	static void LogInvalidGrant(const UObject* Owner, const TCHAR* Category, const int32 Index)
+	{
+		UE_LOG(LogPMHWAbilitySystem, Error, TEXT("%s[%d] on ability set [%s] is not valid."), Category, Index, *GetNameSafe(Owner));
+	}
+}
+
 void FMHWAbilitySet_GrantedHandles::AddAbilitySpecHandle(const FGameplayAbilitySpecHandle& Handle)
 {
 	if (Handle.IsValid())
@@ -26,16 +39,18 @@ void FMHWAbilitySet_GrantedHandles::AddGameplayEffectHandle(const FActiveGamepla
 
 void FMHWAbilitySet_GrantedHandles::AddAttributeSet(UAttributeSet* Set)
 {
-	GrantedAttributeSets.Add(Set);
+	if (Set)
+	{
+		GrantedAttributeSets.Add(Set);
+	}
 }
 
 void FMHWAbilitySet_GrantedHandles::TakeFromAbilitySystem(UMHWAbilitySystemComponent* MHWASC)
 {
 	check(MHWASC);
 
-	if (!MHWASC->IsOwnerActorAuthoritative())
+	if (!AbilitySet::CanModifyAbilitySet(MHWASC))
 	{
-		// Must be authoritative to give or take ability sets.
 		return;
 	}
 
@@ -74,20 +89,18 @@ void UMHWAbilitySet::GiveToAbilitySystem(UMHWAbilitySystemComponent* MHWASC, FMH
 {
 	check(MHWASC);
 
-	if (!MHWASC->IsOwnerActorAuthoritative())
+	if (!AbilitySet::CanModifyAbilitySet(MHWASC))
 	{
-		// Must be authoritative to give or take ability sets.
 		return;
 	}
 
-	// Grant the gameplay abilities.
 	for (int32 AbilityIndex = 0; AbilityIndex < GrantedGameplayAbilities.Num(); ++AbilityIndex)
 	{
 		const FMHWAbilitySet_GameplayAbility& AbilityToGrant = GrantedGameplayAbilities[AbilityIndex];
 
 		if (!IsValid(AbilityToGrant.Ability))
 		{
-			UE_LOG(LogPMHWAbilitySystem, Error, TEXT("GrantedGameplayAbilities[%d] on ability set [%s] is not valid."), AbilityIndex, *GetNameSafe(this));
+			AbilitySet::LogInvalidGrant(this, TEXT("GrantedGameplayAbilities"), AbilityIndex);
 			continue;
 		}
 
@@ -105,14 +118,13 @@ void UMHWAbilitySet::GiveToAbilitySystem(UMHWAbilitySystemComponent* MHWASC, FMH
 		}
 	}
 
-	// Grant the gameplay effects.
 	for (int32 EffectIndex = 0; EffectIndex < GrantedGameplayEffects.Num(); ++EffectIndex)
 	{
 		const FMHWAbilitySet_GameplayEffect& EffectToGrant = GrantedGameplayEffects[EffectIndex];
 
 		if (!IsValid(EffectToGrant.GameplayEffect))
 		{
-			UE_LOG(LogPMHWAbilitySystem, Error, TEXT("GrantedGameplayEffects[%d] on ability set [%s] is not valid"), EffectIndex, *GetNameSafe(this));
+			AbilitySet::LogInvalidGrant(this, TEXT("GrantedGameplayEffects"), EffectIndex);
 			continue;
 		}
 
@@ -125,14 +137,13 @@ void UMHWAbilitySet::GiveToAbilitySystem(UMHWAbilitySystemComponent* MHWASC, FMH
 		}
 	}
 
-	// Grant the attribute sets.
 	for (int32 SetIndex = 0; SetIndex < GrantedAttributes.Num(); ++SetIndex)
 	{
 		const FMHWAbilitySet_AttributeSet& SetToGrant = GrantedAttributes[SetIndex];
 
 		if (!IsValid(SetToGrant.AttributeSet))
 		{
-			UE_LOG(LogPMHWAbilitySystem, Error, TEXT("GrantedAttributes[%d] on ability set [%s] is not valid"), SetIndex, *GetNameSafe(this));
+			AbilitySet::LogInvalidGrant(this, TEXT("GrantedAttributes"), SetIndex);
 			continue;
 		}
 
@@ -145,4 +156,3 @@ void UMHWAbilitySet::GiveToAbilitySystem(UMHWAbilitySystemComponent* MHWASC, FMH
 		}
 	}
 }
-

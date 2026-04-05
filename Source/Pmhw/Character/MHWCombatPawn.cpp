@@ -45,6 +45,11 @@ void AMHWCombatPawn::BeginPlay()
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+		if (CombatComponent && CombatComponent->bApplyInitialAttributesEffectOnInitialize)
+		{
+			CombatComponent->ApplyInitialAttributesEffect();
+		}
 	}
 }
 

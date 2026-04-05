@@ -5,13 +5,22 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AN_ApplyCameraMotion)
 
+namespace ApplyCameraMotionNotify
+{
+	static AMHWPlayerController* GetLocalPlayerController(USkeletalMeshComponent* MeshComp)
+	{
+		APawn* OwnerPawn = MeshComp ? Cast<APawn>(MeshComp->GetOwner()) : nullptr;
+		AMHWPlayerController* PlayerController = OwnerPawn ? Cast<AMHWPlayerController>(OwnerPawn->GetController()) : nullptr;
+		return PlayerController && PlayerController->IsLocalController() ? PlayerController : nullptr;
+	}
+}
+
 void UAN_ApplyCameraMotion::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	APawn* OwnerPawn = MeshComp ? Cast<APawn>(MeshComp->GetOwner()) : nullptr;
-	AMHWPlayerController* PlayerController = OwnerPawn ? Cast<AMHWPlayerController>(OwnerPawn->GetController()) : nullptr;
-	if (!PlayerController || !PlayerController->IsLocalController())
+	AMHWPlayerController* PlayerController = ApplyCameraMotionNotify::GetLocalPlayerController(MeshComp);
+	if (!PlayerController)
 	{
 		return;
 	}

@@ -183,7 +183,11 @@ public:
 
 private:
 	bool TryInitializeFromOwner();
+	void ResetActiveWindowState();
 	void StopTraceAndClearDamageSpec();
+	bool ResolveWindowTraceConfiguration(const FMHWAttackWindowSpec& WindowSpec, FName& OutBaseSocket, TArray<FName>& OutTraceSockets) const;
+	void ApplyWindowTracePresentation(const FMHWAttackWindowSpec& WindowSpec, const FGameplayTag& ResolvedAttackSpecTag, const FMHWPhysicalDamageSpec& ResolvedDamageSpec);
+	bool StartResolvedTrace(const FMHWAttackWindowSpec& WindowSpec, const FName& ResolvedBaseSocket, const TArray<FName>& ResolvedTraceSockets);
 	FMHWPhysicalDamageSpec BuildDamageSpecForWindow(const FMHWAttackWindowSpec& WindowSpec) const;
 	void ConfigureHitstopForWindow(const FMHWAttackWindowSpec& WindowSpec, const FGameplayTag& ResolvedAttackSpecTag, const FMHWPhysicalDamageSpec& ResolvedDamageSpec);
 	int32 ResolveBonusCheckWindowIndex(const FMHWAttackWindowSpec& WindowSpec) const;

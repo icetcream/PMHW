@@ -10,6 +10,8 @@
 #include "MHWPlayerController.generated.h"
 
 class UMHWCombatCameraModifier;
+class UMHWCombatCameraComponent;
+class UMHWCombatComponent;
 
 /**
  * 
@@ -38,6 +40,8 @@ public:
 	void ClearCombatCameraMotion(float BlendOutDuration = 0.12f);
 
 private:
+	UMHWCombatCameraComponent* GetCombatCameraComponent() const;
+	UMHWCombatComponent* GetCombatComponent(APawn* InPawn) const;
 	void TryInitOverlay(APawn* InPawn);
 	UMHWCombatCameraModifier* GetOrCreateCombatCameraModifier() const;
 

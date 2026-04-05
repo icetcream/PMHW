@@ -9,6 +9,62 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 
+namespace WeaponRibbonTrailNotify
+{
+	static UMHWEquipmentManagerComponent* GetEquipmentManager(USkeletalMeshComponent* MeshComp)
+	{
+		if (!MeshComp)
+		{
+			return nullptr;
+		}
+
+		AActor* OwnerActor = MeshComp->GetOwner();
+		if (!OwnerActor || !OwnerActor->Implements<UMHWCharacterInterface>())
+		{
+			return nullptr;
+		}
+
+		return const_cast<UMHWEquipmentManagerComponent*>(IMHWCharacterInterface::Execute_GetEquipmentManagerComponent(OwnerActor));
+	}
+
+	static TSubclassOf<UMHWEquipmentInstance> ResolveWeaponQueryType(TSubclassOf<UMHWEquipmentInstance> WeaponInstanceClass)
+	{
+		TSubclassOf<UMHWEquipmentInstance> QueryType = WeaponInstanceClass;
+		if (!QueryType)
+		{
+			QueryType = UMHWEquipmentInstance::StaticClass();
+		}
+
+		return QueryType;
+	}
+
+	static void ApplyTrailTransform(UNiagaraComponent* NiagaraComponent, const FVector& LocationOffset, const FRotator& RotationOffset, const FVector& Scale)
+	{
+		if (!NiagaraComponent)
+		{
+			return;
+		}
+
+		NiagaraComponent->SetRelativeLocation(LocationOffset);
+		NiagaraComponent->SetRelativeRotation(RotationOffset);
+		NiagaraComponent->SetRelativeScale3D(Scale);
+	}
+
+	static void DeactivateTrailComponent(UNiagaraComponent* NiagaraComponent, const bool bDestroyAtEnd)
+	{
+		if (!NiagaraComponent)
+		{
+			return;
+		}
+
+		NiagaraComponent->Deactivate();
+		if (bDestroyAtEnd)
+		{
+			NiagaraComponent->ReleaseToPool();
+		}
+	}
+}
+
 void UANS_PlayWeaponRibbonTrail::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration,
 	const FAnimNotifyEventReference& EventReference)
 {
@@ -30,16 +86,10 @@ void UANS_PlayWeaponRibbonTrail::NotifyBegin(USkeletalMeshComponent* MeshComp, U
 	{
 		if (UNiagaraComponent* NiagaraComponent = ExistingComponent->Get())
 		{
-			NiagaraComponent->Deactivate();
-			if (bDestroyAtEnd)
+			WeaponRibbonTrailNotify::DeactivateTrailComponent(NiagaraComponent, bDestroyAtEnd);
+			if (!bDestroyAtEnd)
 			{
-				NiagaraComponent->ReleaseToPool();
-			}
-			else
-			{
-				NiagaraComponent->SetRelativeLocation(LocationOffset);
-				NiagaraComponent->SetRelativeRotation(RotationOffset);
-				NiagaraComponent->SetRelativeScale3D(Scale);
+				WeaponRibbonTrailNotify::ApplyTrailTransform(NiagaraComponent, LocationOffset, RotationOffset, Scale);
 				NiagaraComponent->Activate(true);
 				return;
 			}
@@ -67,7 +117,7 @@ void UANS_PlayWeaponRibbonTrail::NotifyBegin(USkeletalMeshComponent* MeshComp, U
 		return;
 	}
 
-	NiagaraComponent->SetRelativeScale3D(Scale);
+	WeaponRibbonTrailNotify::ApplyTrailTransform(NiagaraComponent, LocationOffset, RotationOffset, Scale);
 	ActiveTrailComponents.Add(MeshKey, NiagaraComponent);
 }
 
@@ -96,11 +146,7 @@ void UANS_PlayWeaponRibbonTrail::NotifyEnd(USkeletalMeshComponent* MeshComp, UAn
 
 	if (UNiagaraComponent* NiagaraComponent = ActiveComponent->Get())
 	{
-		NiagaraComponent->Deactivate();
-		if (bDestroyAtEnd)
-		{
-			NiagaraComponent->ReleaseToPool();
-		}
+		WeaponRibbonTrailNotify::DeactivateTrailComponent(NiagaraComponent, bDestroyAtEnd);
 	}
 
 	if (bDestroyAtEnd)
@@ -123,25 +169,15 @@ USkeletalMeshComponent* UANS_PlayWeaponRibbonTrail::ResolveWeaponMesh(USkeletalM
 		return nullptr;
 	}
 
-	AActor* OwnerActor = MeshComp->GetOwner();
-	if (!OwnerActor || !OwnerActor->Implements<UMHWCharacterInterface>())
-	{
-		return nullptr;
-	}
-
-	const UMHWEquipmentManagerComponent* EquipmentManager = IMHWCharacterInterface::Execute_GetEquipmentManagerComponent(OwnerActor);
+	UMHWEquipmentManagerComponent* EquipmentManager = WeaponRibbonTrailNotify::GetEquipmentManager(MeshComp);
 	if (!EquipmentManager)
 	{
 		return nullptr;
 	}
 
-	TSubclassOf<UMHWEquipmentInstance> QueryType = WeaponInstanceClass;
-	if (!QueryType)
-	{
-		QueryType = UMHWEquipmentInstance::StaticClass();
-	}
+	const TSubclassOf<UMHWEquipmentInstance> QueryType = WeaponRibbonTrailNotify::ResolveWeaponQueryType(WeaponInstanceClass);
 
-	UMHWEquipmentInstance* EquipmentInstance = const_cast<UMHWEquipmentManagerComponent*>(EquipmentManager)->GetFirstInstanceOfType(QueryType);
+	UMHWEquipmentInstance* EquipmentInstance = EquipmentManager->GetFirstInstanceOfType(QueryType);
 	if (!EquipmentInstance)
 	{
 		return nullptr;

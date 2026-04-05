@@ -29,6 +29,48 @@ UMeleeTraceComponent::UMeleeTraceComponent()
 	PrimaryComponentTick.bStartWithTickEnabled = false; 
 }
 
+void UMeleeTraceComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ResetHitStop();
+	StopTrace();
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void UMeleeTraceComponent::ResetTraceRuntimeState()
+{
+	HitActors.Empty();
+	TraceSocketsLocalOffsets.Empty();
+	ActiveTraceSockets.Empty();
+	BaseSocketName = NAME_None;
+	ActiveTraceMeshComp = nullptr;
+}
+
+void UMeleeTraceComponent::ResetOwnerMontageHitstopState()
+{
+	bHasOwnerMontageHitstop = false;
+	CachedOwnerAnimInstance.Reset();
+	CachedOwnerMontage.Reset();
+	CachedOwnerSkeletalMesh.Reset();
+	DefaultOwnerMontagePlayRate = 1.0f;
+	bOwnerMeshAnimationPausedByHitstop = false;
+	CurrentMeshFreezeDuration = 0.0f;
+}
+
+void UMeleeTraceComponent::EnsureDefaultHitStopConfigFromEquipment()
+{
+	if (!CurrentHitstopData && CachedEquipmentInstance)
+	{
+		CurrentHitstopData = CachedEquipmentInstance->GetHitStopData();
+		CurrentHitstopStrengthMultiplier = 1.0f;
+	}
+}
+
+void UMeleeTraceComponent::RefreshTickEnabledState()
+{
+	SetComponentTickEnabled(bIsTracing || IsHitstopActive());
+}
+
 
 USkeletalMeshComponent* UMeleeTraceComponent::GetWeaponMesh()
 {
@@ -156,14 +198,7 @@ void UMeleeTraceComponent::ApplyHitStop(AActor* HitActor)
 	{
 		DefaultTimeDilation = OwnerActor->CustomTimeDilation;
 		HitstopAffectedActors.Empty();
-		bHasOwnerMontageHitstop = false;
-		CachedOwnerAnimInstance.Reset();
-		CachedOwnerMontage.Reset();
-		CachedOwnerSkeletalMesh.Reset();
-		DefaultOwnerMontagePlayRate = 1.0f;
-		bOwnerMeshAnimationPausedByHitstop = false;
-		CurrentMeshFreezeDuration = 0.0f;
-
+		ResetOwnerMontageHitstopState();
 		bHasOwnerMontageHitstop = InitializeOwnerMontageHitstop();
 	}
 
@@ -443,21 +478,16 @@ void UMeleeTraceComponent::ResetHitStop()
 		SetOwnerMeshAnimationPaused(false);
 	}
 
-	bHasOwnerMontageHitstop = false;
-	CachedOwnerAnimInstance.Reset();
-	CachedOwnerMontage.Reset();
-	CachedOwnerSkeletalMesh.Reset();
-	DefaultOwnerMontagePlayRate = 1.0f;
-	bOwnerMeshAnimationPausedByHitstop = false;
-	CurrentMeshFreezeDuration = 0.0f;
+	ResetOwnerMontageHitstopState();
 
-	// 如果挥砍判定也早就结束了，为了省性能，关掉 Tick
 	if (!bIsTracing)
 	{
 		CurrentHitstopData = nullptr;
 		CurrentHitstopStrengthMultiplier = 1.0f;
-		SetComponentTickEnabled(false);
 	}
+
+	// 如果挥砍判定也早就结束了，为了省性能，关掉 Tick
+	RefreshTickEnabledState();
 }
 
 void UMeleeTraceComponent::StartTrace(FName InBaseSocket, const TArray<FName>& InTraceSockets)
@@ -493,17 +523,12 @@ void UMeleeTraceComponent::StartSocketTrace(FName InBaseSocket, const TArray<FNa
 		return;
 	}
 
-	if (!CurrentHitstopData && CachedEquipmentInstance)
-	{
-		CurrentHitstopData = CachedEquipmentInstance->GetHitStopData();
-		CurrentHitstopStrengthMultiplier = 1.0f;
-	}
+	EnsureDefaultHitStopConfigFromEquipment();
 
+	ResetTraceRuntimeState();
 	BaseSocketName = InBaseSocket;
 	ActiveTraceSockets = InTraceSockets;
 	ActiveTraceMeshComp = TraceMesh;
-	HitActors.Empty();
-	TraceSocketsLocalOffsets.Empty();
 	PreviousBaseTransform = TraceMesh->GetSocketTransform(BaseSocketName);
 
 	for (const FName& SocketName : ActiveTraceSockets)
@@ -527,18 +552,10 @@ void UMeleeTraceComponent::StartCharacterCollisionTrace()
 		return;
 	}
 
-	if (!CurrentHitstopData && CachedEquipmentInstance)
-	{
-		CurrentHitstopData = CachedEquipmentInstance->GetHitStopData();
-		CurrentHitstopStrengthMultiplier = 1.0f;
-	}
+	EnsureDefaultHitStopConfigFromEquipment();
 
-	HitActors.Empty();
-	TraceSocketsLocalOffsets.Empty();
-	ActiveTraceSockets.Empty();
-	BaseSocketName = NAME_None;
+	ResetTraceRuntimeState();
 	PreviousOwnerCapsuleTransform = CapsuleComponent->GetComponentTransform();
-	ActiveTraceMeshComp = nullptr;
 
 	CurrentTraceMode = EMHWTraceMode::SweepCapsule;
 	bIsTracing = true;
@@ -670,16 +687,9 @@ void UMeleeTraceComponent::ClearCachedHitCameraShake()
 void UMeleeTraceComponent::StopTrace()
 {
 	bIsTracing = false;
-	HitActors.Empty();
-	TraceSocketsLocalOffsets.Empty();
-	ActiveTraceSockets.Empty();
-	BaseSocketName = NAME_None;
-	ActiveTraceMeshComp = nullptr;
+	ResetTraceRuntimeState();
 	CurrentTraceMode = EMHWTraceMode::WeaponSockets;
-	if (!IsHitstopActive())
-	{
-		SetComponentTickEnabled(false);
-	}
+	RefreshTickEnabledState();
 }
 
 void UMeleeTraceComponent::SetHitVFXSpec(const FMHWMeleeHitVFXSpec& InHitVFXSpec)

@@ -5,23 +5,31 @@
 #include "GameFramework/Actor.h"
 #include "Interface/MHWCharacterInterface.h"
 
+namespace MeleeAttackWindowNotify
+{
+	static UMHWAttackComponent* GetAttackComponent(USkeletalMeshComponent* MeshComp)
+	{
+		if (!MeshComp)
+		{
+			return nullptr;
+		}
+
+		AActor* OwnerActor = MeshComp->GetOwner();
+		if (!OwnerActor || !OwnerActor->Implements<UMHWCharacterInterface>())
+		{
+			return nullptr;
+		}
+
+		return IMHWCharacterInterface::Execute_GetAttackComponent(OwnerActor);
+	}
+}
+
 void UANS_MeleeAttackWindow::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration,
 	const FAnimNotifyEventReference& EventReference)
 {
 	Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
-	if (!MeshComp)
-	{
-		return;
-	}
-
-	AActor* OwnerActor = MeshComp->GetOwner();
-	if (!OwnerActor || !OwnerActor->Implements<UMHWCharacterInterface>())
-	{
-		return;
-	}
-
-	if (UMHWAttackComponent* AttackComponent = IMHWCharacterInterface::Execute_GetAttackComponent(OwnerActor))
+	if (UMHWAttackComponent* AttackComponent = MeleeAttackWindowNotify::GetAttackComponent(MeshComp))
 	{
 		AttackComponent->BeginAttackWindow(AttackWindowSpec);
 	}
@@ -32,18 +40,7 @@ void UANS_MeleeAttackWindow::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSe
 {
 	Super::NotifyEnd(MeshComp, Animation, EventReference);
 
-	if (!MeshComp)
-	{
-		return;
-	}
-
-	AActor* OwnerActor = MeshComp->GetOwner();
-	if (!OwnerActor || !OwnerActor->Implements<UMHWCharacterInterface>())
-	{
-		return;
-	}
-
-	if (UMHWAttackComponent* AttackComponent = IMHWCharacterInterface::Execute_GetAttackComponent(OwnerActor))
+	if (UMHWAttackComponent* AttackComponent = MeleeAttackWindowNotify::GetAttackComponent(MeshComp))
 	{
 		AttackComponent->EndAttackWindow();
 	}

@@ -30,6 +30,32 @@ namespace ComboMontagePlayTask
 		return IMHWCharacterInterface::Execute_GetAttackComponent(InActor);
 	}
 
+	static UMHWComboPreInputComponent* GetComboPreInputComponent(AActor* InActor)
+	{
+		if (!InActor || !InActor->Implements<UMHWCharacterInterface>())
+		{
+			return nullptr;
+		}
+
+		return IMHWCharacterInterface::Execute_GetComboPreInputComponent(InActor);
+	}
+
+	static UMotionWarpingComponent* GetMotionWarpingComponent(AMHWCharacter* Character)
+	{
+		return Character ? Character->FindComponentByClass<UMotionWarpingComponent>() : nullptr;
+	}
+
+	static UAnimInstance* GetAnimInstance(AMHWCharacter* Character)
+	{
+		if (!Character)
+		{
+			return nullptr;
+		}
+
+		USkeletalMeshComponent* MeshComponent = Character->GetMesh();
+		return MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
+	}
+
 	static void ResetInstanceData(FSTT_ComboMontagePlayInstanceData& InstanceData)
 	{
 		InstanceData.RuntimeState.Reset();
@@ -137,24 +163,21 @@ namespace ComboMontagePlayTask
 
 		if (bClearMotionWarpingOnExit && !MotionWarpingName.IsNone())
 		{
-			if (UMotionWarpingComponent* MotionWarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+			if (UMotionWarpingComponent* MotionWarpingComp = GetMotionWarpingComponent(Character))
 			{
 				MotionWarpingComp->RemoveWarpTarget(MotionWarpingName);
 			}
 		}
 
-		if (Character->Implements<UMHWCharacterInterface>())
+		if (UMHWComboPreInputComponent* ComboPreInputComp = GetComboPreInputComponent(Character))
 		{
-			if (UMHWComboPreInputComponent* ComboPreInputComp = IMHWCharacterInterface::Execute_GetComboPreInputComponent(Character))
+			if (bClearPreInputOnExit)
 			{
-				if (bClearPreInputOnExit)
-				{
-					ComboPreInputComp->ClearBuffer();
-				}
-				if (bDisablePreInputOnExit)
-				{
-					ComboPreInputComp->bCanPreInput = false;
-				}
+				ComboPreInputComp->ClearBuffer();
+			}
+			if (bDisablePreInputOnExit)
+			{
+				ComboPreInputComp->bCanPreInput = false;
 			}
 		}
 	}
@@ -178,19 +201,17 @@ namespace ComboMontagePlayTask
 		UAnimInstance* AnimInstance = InstanceData.CachedAnimInstance.Get();
 		if (!AnimInstance)
 		{
-			if (USkeletalMeshComponent* MeshComponent = Character->GetMesh())
-			{
-				AnimInstance = MeshComponent->GetAnimInstance();
-			}
+			AnimInstance = GetAnimInstance(Character);
 		}
 
-		// Stop montage first, so AnimNotifyState can receive end callbacks while context is still intact.
+		// Explicit task shutdown handles cleanup itself, so detach task delegates first to
+		// avoid re-entering cleanup through montage interruption callbacks.
+		UnbindMontageDelegates(AnimInstance, ComboMontage);
+
 		if (bStopMontage && ComboMontage)
 		{
 			Character->StopAnimMontage(ComboMontage);
 		}
-
-		UnbindMontageDelegates(AnimInstance, ComboMontage);
 
 		CleanupCharacterState(
 			Character,
@@ -374,7 +395,7 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 		MotionWarpingNameToApply,
 		MotionWarpingTargetTransform))
 	{
-		if (UMotionWarpingComponent* MotionWarpingComp = Character->FindComponentByClass<UMotionWarpingComponent>())
+		if (UMotionWarpingComponent* MotionWarpingComp = ComboMontagePlayTask::GetMotionWarpingComponent(Character))
 		{
 			MotionWarpingComp->AddOrUpdateWarpTargetFromTransform(MotionWarpingNameToApply, MotionWarpingTargetTransform);
 			InstanceData.ActiveMotionWarpingName = MotionWarpingNameToApply;
@@ -382,8 +403,7 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 		}
 	}
 
-	USkeletalMeshComponent* MeshComponent = Character->GetMesh();
-	UAnimInstance* AnimInstance = MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
+	UAnimInstance* AnimInstance = ComboMontagePlayTask::GetAnimInstance(Character);
 	if (!AnimInstance)
 	{
 		ComboMontagePlayTask::CleanupTaskState(
@@ -464,6 +484,8 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 		}
 	}
 
+	// Delegates only touch RuntimeState so they remain valid even if the StateTree task
+	// instance is destroyed before the montage callback fires.
 	const TSharedPtr<FComboMontagePlayRuntimeState> RuntimeState = InstanceData.RuntimeState;
 
 	FOnMontageBlendingOutStarted BlendingOutDelegate;
@@ -532,8 +554,7 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::Tick(FStateTreeExecutionContext& Cont
 	UAnimInstance* AnimInstance = InstanceData.CachedAnimInstance.Get();
 	if (!AnimInstance)
 	{
-		USkeletalMeshComponent* MeshComponent = Character->GetMesh();
-		AnimInstance = MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
+		AnimInstance = ComboMontagePlayTask::GetAnimInstance(Character);
 		InstanceData.CachedAnimInstance = AnimInstance;
 	}
 	if (!AnimInstance)

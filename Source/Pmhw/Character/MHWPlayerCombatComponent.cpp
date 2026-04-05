@@ -7,26 +7,23 @@
 
 void UMHWPlayerCombatComponent::ApplyAttackPanelBonus(const FMHWPhysicalAttackPanelBonus& Bonus)
 {
-	PhysicalAttackPanel.TrueRawAttack += Bonus.TrueRawAttackBonus;
-	PhysicalAttackPanel.MotionValueScale += Bonus.MotionValueScaleBonus;
-	PhysicalAttackPanel.SharpnessMultiplier += Bonus.SharpnessMultiplierBonus;
-	PhysicalAttackPanel.CriticalChance += Bonus.CriticalChanceBonus;
-	PhysicalAttackPanel.PositiveCriticalMultiplier += Bonus.PositiveCriticalMultiplierBonus;
-	PhysicalAttackPanel.NegativeCriticalMultiplier += Bonus.NegativeCriticalMultiplierBonus;
-	PhysicalAttackPanel.BounceMultiplier += Bonus.BounceMultiplierBonus;
-
-	NormalizePhysicalAttackPanel();
+	ApplyAttackPanelBonusInternal(Bonus, 1.0f);
 }
 
 void UMHWPlayerCombatComponent::RemoveAttackPanelBonus(const FMHWPhysicalAttackPanelBonus& Bonus)
 {
-	PhysicalAttackPanel.TrueRawAttack -= Bonus.TrueRawAttackBonus;
-	PhysicalAttackPanel.MotionValueScale -= Bonus.MotionValueScaleBonus;
-	PhysicalAttackPanel.SharpnessMultiplier -= Bonus.SharpnessMultiplierBonus;
-	PhysicalAttackPanel.CriticalChance -= Bonus.CriticalChanceBonus;
-	PhysicalAttackPanel.PositiveCriticalMultiplier -= Bonus.PositiveCriticalMultiplierBonus;
-	PhysicalAttackPanel.NegativeCriticalMultiplier -= Bonus.NegativeCriticalMultiplierBonus;
-	PhysicalAttackPanel.BounceMultiplier -= Bonus.BounceMultiplierBonus;
+	ApplyAttackPanelBonusInternal(Bonus, -1.0f);
+}
+
+void UMHWPlayerCombatComponent::ApplyAttackPanelBonusInternal(const FMHWPhysicalAttackPanelBonus& Bonus, const float Sign)
+{
+	PhysicalAttackPanel.TrueRawAttack += Bonus.TrueRawAttackBonus * Sign;
+	PhysicalAttackPanel.MotionValueScale += Bonus.MotionValueScaleBonus * Sign;
+	PhysicalAttackPanel.SharpnessMultiplier += Bonus.SharpnessMultiplierBonus * Sign;
+	PhysicalAttackPanel.CriticalChance += Bonus.CriticalChanceBonus * Sign;
+	PhysicalAttackPanel.PositiveCriticalMultiplier += Bonus.PositiveCriticalMultiplierBonus * Sign;
+	PhysicalAttackPanel.NegativeCriticalMultiplier += Bonus.NegativeCriticalMultiplierBonus * Sign;
+	PhysicalAttackPanel.BounceMultiplier += Bonus.BounceMultiplierBonus * Sign;
 
 	NormalizePhysicalAttackPanel();
 }

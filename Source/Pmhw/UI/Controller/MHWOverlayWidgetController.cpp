@@ -4,10 +4,25 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWOverlayWidgetController)
 
+void UMHWOverlayWidgetController::UnbindFromCombatComponent()
+{
+	if (!BoundCombatComponent)
+	{
+		return;
+	}
+
+	BoundCombatComponent->OnHealthChanged.RemoveDynamic(this, &ThisClass::HandleHealthChanged);
+	BoundCombatComponent->OnStaminaChanged.RemoveDynamic(this, &ThisClass::HandleStaminaChanged);
+	BoundCombatComponent->OnDamaged.RemoveDynamic(this, &ThisClass::HandleDamaged);
+	BoundCombatComponent->OnDeath.RemoveDynamic(this, &ThisClass::HandleDeath);
+	BoundCombatComponent = nullptr;
+}
+
 void UMHWOverlayWidgetController::BindCallbacksToDependencies()
 {
 	if (!CombatComponent)
 	{
+		UnbindFromCombatComponent();
 		return;
 	}
 
@@ -16,14 +31,8 @@ void UMHWOverlayWidgetController::BindCallbacksToDependencies()
 		return;
 	}
 
-	if (BoundCombatComponent)
-	{
-		BoundCombatComponent->OnHealthChanged.RemoveDynamic(this, &ThisClass::HandleHealthChanged);
-		BoundCombatComponent->OnStaminaChanged.RemoveDynamic(this, &ThisClass::HandleStaminaChanged);
-		BoundCombatComponent->OnDamaged.RemoveDynamic(this, &ThisClass::HandleDamaged);
-		BoundCombatComponent->OnDeath.RemoveDynamic(this, &ThisClass::HandleDeath);
-	}
-
+	// Local HUD can be rebound during pawn/controller changes, so stale combat delegates must be released first.
+	UnbindFromCombatComponent();
 	BoundCombatComponent = CombatComponent;
 	CombatComponent->OnHealthChanged.AddDynamic(this, &ThisClass::HandleHealthChanged);
 	CombatComponent->OnStaminaChanged.AddDynamic(this, &ThisClass::HandleStaminaChanged);
@@ -42,21 +51,29 @@ void UMHWOverlayWidgetController::BroadcastInitialValues()
 	HandleStaminaChanged(CombatComponent->GetStamina(), CombatComponent->GetMaxStamina(), 0.0f);
 }
 
-void UMHWOverlayWidgetController::HandleHealthChanged(float NewValue, float MaxValue, float DeltaValue)
+void UMHWOverlayWidgetController::BroadcastResourceChanged(
+	const float NewValue,
+	const float MaxValue,
+	FMHWOnFloatValueChangedSignature& OnValueChanged,
+	FMHWOnFloatValueChangedSignature& OnMaxValueChanged,
+	FMHWOnFloatValueChangedSignature& OnPercentChanged) const
 {
-	OnHealthChanged.Broadcast(NewValue);
-	OnMaxHealthChanged.Broadcast(MaxValue);
-	OnHealthPercentChanged.Broadcast(MaxValue > 0.0f ? (NewValue / MaxValue) : 0.0f);
+	OnValueChanged.Broadcast(NewValue);
+	OnMaxValueChanged.Broadcast(MaxValue);
+	OnPercentChanged.Broadcast(MaxValue > 0.0f ? (NewValue / MaxValue) : 0.0f);
 }
 
-void UMHWOverlayWidgetController::HandleStaminaChanged(float NewValue, float MaxValue, float DeltaValue)
+void UMHWOverlayWidgetController::HandleHealthChanged(const float NewValue, const float MaxValue, float /*DeltaValue*/)
 {
-	OnStaminaChanged.Broadcast(NewValue);
-	OnMaxStaminaChanged.Broadcast(MaxValue);
-	OnStaminaPercentChanged.Broadcast(MaxValue > 0.0f ? (NewValue / MaxValue) : 0.0f);
+	BroadcastResourceChanged(NewValue, MaxValue, OnHealthChanged, OnMaxHealthChanged, OnHealthPercentChanged);
 }
 
-void UMHWOverlayWidgetController::HandleDamaged(float DamageAmount, float NewHealth)
+void UMHWOverlayWidgetController::HandleStaminaChanged(const float NewValue, const float MaxValue, float /*DeltaValue*/)
+{
+	BroadcastResourceChanged(NewValue, MaxValue, OnStaminaChanged, OnMaxStaminaChanged, OnStaminaPercentChanged);
+}
+
+void UMHWOverlayWidgetController::HandleDamaged(const float DamageAmount, const float NewHealth)
 {
 	OnDamaged.Broadcast(DamageAmount, NewHealth);
 }

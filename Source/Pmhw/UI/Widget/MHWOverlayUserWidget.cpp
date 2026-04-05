@@ -6,12 +6,34 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWOverlayUserWidget)
 
+UMHWOverlayUserWidget::FOverlayBarAnimationSettings UMHWOverlayUserWidget::MakeHealthBarAnimationSettings() const
+{
+	FOverlayBarAnimationSettings Settings;
+	Settings.bAnimateDecrease = bAnimateHealthBarOnDamage;
+	Settings.DecreaseDelay = HealthBarDamageDelay;
+	Settings.DecreaseInterpSpeed = HealthBarDamageInterpSpeed;
+	Settings.bSnapOnIncrease = bSnapHealthBarOnHeal;
+	Settings.IncreaseInterpSpeed = HealthBarHealInterpSpeed;
+	return Settings;
+}
+
+UMHWOverlayUserWidget::FOverlayBarAnimationSettings UMHWOverlayUserWidget::MakeStaminaBarAnimationSettings() const
+{
+	FOverlayBarAnimationSettings Settings;
+	Settings.bAnimateDecrease = bAnimateStaminaBar;
+	Settings.DecreaseDelay = StaminaBarConsumeDelay;
+	Settings.DecreaseInterpSpeed = StaminaBarConsumeInterpSpeed;
+	Settings.bSnapOnIncrease = bSnapStaminaBarOnRestore;
+	Settings.IncreaseInterpSpeed = StaminaBarRestoreInterpSpeed;
+	return Settings;
+}
+
 void UMHWOverlayUserWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	UpdateAnimatedHealthBar(InDeltaTime);
-	UpdateAnimatedStaminaBar(InDeltaTime);
+	UpdateAnimatedBar(InDeltaTime, MakeHealthBarAnimationSettings(), HealthBarState, HealthBarImage.Get(), HealthBarMaterialInstance);
+	UpdateAnimatedBar(InDeltaTime, MakeStaminaBarAnimationSettings(), StaminaBarState, StaminaBarImage.Get(), StaminaBarMaterialInstance);
 }
 
 void UMHWOverlayUserWidget::NativeDestruct()
@@ -66,201 +88,134 @@ void UMHWOverlayUserWidget::UnbindFromController()
 	BoundOverlayWidgetController = nullptr;
 }
 
-void UMHWOverlayUserWidget::ApplyHealthBarPercent(float NewPercent)
+void UMHWOverlayUserWidget::ApplyBarPercent(
+	UImage* BarImage,
+	TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance,
+	const float NewPercent)
 {
-	InitializeDynamicMaterials();
-	if (HealthBarMaterialInstance)
+	if (!MaterialInstance && BarImage)
 	{
-		HealthBarMaterialInstance->SetScalarParameterValue(ProgressParameterName, FMath::Clamp(NewPercent, 0.0f, 1.0f));
+		MaterialInstance = BarImage->GetDynamicMaterial();
+	}
+
+	if (MaterialInstance)
+	{
+		MaterialInstance->SetScalarParameterValue(ProgressParameterName, FMath::Clamp(NewPercent, 0.0f, 1.0f));
 	}
 }
 
-void UMHWOverlayUserWidget::ApplyStaminaBarPercent(float NewPercent)
+void UMHWOverlayUserWidget::UpdateAnimatedBar(
+	const float DeltaTime,
+	const FOverlayBarAnimationSettings& Settings,
+	FOverlayBarAnimationState& State,
+	UImage* BarImage,
+	TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance)
 {
-	InitializeDynamicMaterials();
-	if (StaminaBarMaterialInstance)
-	{
-		StaminaBarMaterialInstance->SetScalarParameterValue(ProgressParameterName, FMath::Clamp(NewPercent, 0.0f, 1.0f));
-	}
-}
-
-void UMHWOverlayUserWidget::UpdateAnimatedHealthBar(float DeltaTime)
-{
-	if (!bHasInitializedHealthBar)
+	if (!State.bInitialized)
 	{
 		return;
 	}
 
-	if (FMath::IsNearlyEqual(CurrentDisplayedHealthPercent, TargetHealthPercent, KINDA_SMALL_NUMBER))
+	if (FMath::IsNearlyEqual(State.CurrentDisplayedPercent, State.TargetPercent, KINDA_SMALL_NUMBER))
 	{
-		CurrentDisplayedHealthPercent = TargetHealthPercent;
+		State.CurrentDisplayedPercent = State.TargetPercent;
+		ApplyBarPercent(BarImage, MaterialInstance, State.CurrentDisplayedPercent);
 		return;
 	}
 
-	if (CurrentDisplayedHealthPercent > TargetHealthPercent)
+	if (State.CurrentDisplayedPercent > State.TargetPercent)
 	{
-		if (!bAnimateHealthBarOnDamage)
+		if (!Settings.bAnimateDecrease)
 		{
-			CurrentDisplayedHealthPercent = TargetHealthPercent;
-			ApplyHealthBarPercent(CurrentDisplayedHealthPercent);
+			State.CurrentDisplayedPercent = State.TargetPercent;
+			ApplyBarPercent(BarImage, MaterialInstance, State.CurrentDisplayedPercent);
 			return;
 		}
 
-		if (RemainingHealthDamageDelay > 0.0f)
+		if (State.RemainingDelay > 0.0f)
 		{
-			RemainingHealthDamageDelay = FMath::Max(0.0f, RemainingHealthDamageDelay - DeltaTime);
+			State.RemainingDelay = FMath::Max(0.0f, State.RemainingDelay - DeltaTime);
 			return;
 		}
 
-		CurrentDisplayedHealthPercent = FMath::FInterpConstantTo(
-			CurrentDisplayedHealthPercent,
-			TargetHealthPercent,
+		// Resource loss is delayed slightly to preserve the MHW-style "lagging" bar feel.
+		State.CurrentDisplayedPercent = FMath::FInterpConstantTo(
+			State.CurrentDisplayedPercent,
+			State.TargetPercent,
 			DeltaTime,
-			HealthBarDamageInterpSpeed);
+			Settings.DecreaseInterpSpeed);
 	}
 	else
 	{
-		RemainingHealthDamageDelay = 0.0f;
+		State.RemainingDelay = 0.0f;
 
-		if (bSnapHealthBarOnHeal)
+		// Resource recovery can either snap or ease depending on the per-bar tuning.
+		if (Settings.bSnapOnIncrease)
 		{
-			CurrentDisplayedHealthPercent = TargetHealthPercent;
+			State.CurrentDisplayedPercent = State.TargetPercent;
 		}
 		else
 		{
-			CurrentDisplayedHealthPercent = FMath::FInterpConstantTo(
-			CurrentDisplayedHealthPercent,
-			TargetHealthPercent,
-			DeltaTime,
-			HealthBarHealInterpSpeed);
-		}
-	}
-
-	ApplyHealthBarPercent(CurrentDisplayedHealthPercent);
-}
-
-void UMHWOverlayUserWidget::UpdateAnimatedStaminaBar(float DeltaTime)
-{
-	if (!bHasInitializedStaminaBar)
-	{
-		return;
-	}
-
-	if (FMath::IsNearlyEqual(CurrentDisplayedStaminaPercent, TargetStaminaPercent, KINDA_SMALL_NUMBER))
-	{
-		CurrentDisplayedStaminaPercent = TargetStaminaPercent;
-		return;
-	}
-
-	if (CurrentDisplayedStaminaPercent > TargetStaminaPercent)
-	{
-		if (!bAnimateStaminaBar)
-		{
-			CurrentDisplayedStaminaPercent = TargetStaminaPercent;
-			ApplyStaminaBarPercent(CurrentDisplayedStaminaPercent);
-			return;
-		}
-
-		if (RemainingStaminaConsumeDelay > 0.0f)
-		{
-			RemainingStaminaConsumeDelay = FMath::Max(0.0f, RemainingStaminaConsumeDelay - DeltaTime);
-			return;
-		}
-
-		CurrentDisplayedStaminaPercent = FMath::FInterpConstantTo(
-			CurrentDisplayedStaminaPercent,
-			TargetStaminaPercent,
-			DeltaTime,
-			StaminaBarConsumeInterpSpeed);
-	}
-	else
-	{
-		RemainingStaminaConsumeDelay = 0.0f;
-
-		if (bSnapStaminaBarOnRestore)
-		{
-			CurrentDisplayedStaminaPercent = TargetStaminaPercent;
-		}
-		else
-		{
-			CurrentDisplayedStaminaPercent = FMath::FInterpConstantTo(
-				CurrentDisplayedStaminaPercent,
-				TargetStaminaPercent,
+			State.CurrentDisplayedPercent = FMath::FInterpConstantTo(
+				State.CurrentDisplayedPercent,
+				State.TargetPercent,
 				DeltaTime,
-				StaminaBarRestoreInterpSpeed);
+				Settings.IncreaseInterpSpeed);
 		}
 	}
 
-	ApplyStaminaBarPercent(CurrentDisplayedStaminaPercent);
+	ApplyBarPercent(BarImage, MaterialInstance, State.CurrentDisplayedPercent);
 }
 
-void UMHWOverlayUserWidget::HandleHealthPercentChanged(float NewPercent)
-{
-	const float ClampedPercent = FMath::Clamp(NewPercent, 0.0f, 1.0f);
-	InitializeDynamicMaterials();
-
-	if (!bHasInitializedHealthBar)
-	{
-		bHasInitializedHealthBar = true;
-		CurrentDisplayedHealthPercent = ClampedPercent;
-		TargetHealthPercent = ClampedPercent;
-		RemainingHealthDamageDelay = 0.0f;
-		ApplyHealthBarPercent(ClampedPercent);
-		return;
-	}
-
-	TargetHealthPercent = ClampedPercent;
-
-	if (TargetHealthPercent < CurrentDisplayedHealthPercent)
-	{
-		RemainingHealthDamageDelay = HealthBarDamageDelay;
-		if (!bAnimateHealthBarOnDamage)
-		{
-			CurrentDisplayedHealthPercent = TargetHealthPercent;
-			ApplyHealthBarPercent(CurrentDisplayedHealthPercent);
-		}
-		return;
-	}
-
-	if (bSnapHealthBarOnHeal)
-	{
-		CurrentDisplayedHealthPercent = TargetHealthPercent;
-	}
-
-	ApplyHealthBarPercent(CurrentDisplayedHealthPercent);
-}
-
-void UMHWOverlayUserWidget::HandleStaminaPercentChanged(float NewPercent)
+void UMHWOverlayUserWidget::HandleBarPercentChanged(
+	const float NewPercent,
+	const FOverlayBarAnimationSettings& Settings,
+	FOverlayBarAnimationState& State,
+	UImage* BarImage,
+	TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance)
 {
 	const float ClampedPercent = FMath::Clamp(NewPercent, 0.0f, 1.0f);
 
-	if (!bHasInitializedStaminaBar)
+	if (!State.bInitialized)
 	{
-		bHasInitializedStaminaBar = true;
-		CurrentDisplayedStaminaPercent = ClampedPercent;
-		TargetStaminaPercent = ClampedPercent;
-		RemainingStaminaConsumeDelay = 0.0f;
-		ApplyStaminaBarPercent(ClampedPercent);
+		// Seed the runtime state from the first controller broadcast so the bar does not animate from a fake default.
+		State.bInitialized = true;
+		State.CurrentDisplayedPercent = ClampedPercent;
+		State.TargetPercent = ClampedPercent;
+		State.RemainingDelay = 0.0f;
+		ApplyBarPercent(BarImage, MaterialInstance, ClampedPercent);
 		return;
 	}
 
-	TargetStaminaPercent = ClampedPercent;
+	State.TargetPercent = ClampedPercent;
 
-	if (TargetStaminaPercent < CurrentDisplayedStaminaPercent)
+	if (State.TargetPercent < State.CurrentDisplayedPercent)
 	{
-		RemainingStaminaConsumeDelay = StaminaBarConsumeDelay;
-		if (!bAnimateStaminaBar)
+		State.RemainingDelay = Settings.DecreaseDelay;
+		if (!Settings.bAnimateDecrease)
 		{
-			CurrentDisplayedStaminaPercent = TargetStaminaPercent;
-			ApplyStaminaBarPercent(CurrentDisplayedStaminaPercent);
+			State.CurrentDisplayedPercent = State.TargetPercent;
+			ApplyBarPercent(BarImage, MaterialInstance, State.CurrentDisplayedPercent);
 		}
 		return;
 	}
 
-	if (bSnapStaminaBarOnRestore)
+	State.RemainingDelay = 0.0f;
+
+	if (Settings.bSnapOnIncrease)
 	{
-		CurrentDisplayedStaminaPercent = TargetStaminaPercent;
+		State.CurrentDisplayedPercent = State.TargetPercent;
 	}
 
-	ApplyStaminaBarPercent(CurrentDisplayedStaminaPercent);
+	ApplyBarPercent(BarImage, MaterialInstance, State.CurrentDisplayedPercent);
+}
+
+void UMHWOverlayUserWidget::HandleHealthPercentChanged(const float NewPercent)
+{
+	HandleBarPercentChanged(NewPercent, MakeHealthBarAnimationSettings(), HealthBarState, HealthBarImage.Get(), HealthBarMaterialInstance);
+}
+
+void UMHWOverlayUserWidget::HandleStaminaPercentChanged(const float NewPercent)
+{
+	HandleBarPercentChanged(NewPercent, MakeStaminaBarAnimationSettings(), StaminaBarState, StaminaBarImage.Get(), StaminaBarMaterialInstance);
 }

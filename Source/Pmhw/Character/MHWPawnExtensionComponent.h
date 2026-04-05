@@ -8,6 +8,7 @@
 #include "MHWPawnExtensionComponent.generated.h"
 
 
+class AActor;
 class UMHWAbilitySystemComponent;
 class UMHWPawnData;
 
@@ -64,9 +65,12 @@ protected:
 	TObjectPtr<UMHWAbilitySystemComponent> AbilitySystemComponent;
 
 	bool bIsInputSet = false;
-	
+
+private:
+	bool DoesAbilitySystemMatchCurrentContext(const UMHWAbilitySystemComponent* InASC, const AActor* InOwnerActor) const;
+	bool RequiresInputReady() const;
+	void RefreshPawnComponentCache();
+	void ResetInitializationState();
 };
-
-
 
 

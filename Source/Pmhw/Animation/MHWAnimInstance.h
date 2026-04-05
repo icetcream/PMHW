@@ -161,6 +161,8 @@ private:
 
 	// 一个辅助函数，用于在 Tag 变化时重新计算当前处于哪种枚举状态
 	void UpdateChargingTypeFromTags();
+	void ResetAnimationRuntimeState();
+	void TryInitializeAbilitySystemFromOwner();
 
 	void ResetFootLockRuntimeData();
 	void UpdateFootLockRuntimeData();

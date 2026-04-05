@@ -25,6 +25,15 @@ void UMHWCombatComponent::BeginPlay()
 	InitializeDamageNumberPool();
 }
 
+void UMHWCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindAttributeDelegates();
+	CachedAbilitySystemComponent = nullptr;
+	InitialAttributesAppliedASC = nullptr;
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void UMHWCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -35,13 +44,18 @@ void UMHWCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 
 UAbilitySystemComponent* UMHWCombatComponent::GetAbilitySystemComponent() const
 {
-	if (CachedAbilitySystemComponent)
+	if (UAbilitySystemComponent* OwnerASC = ResolveOwnerAbilitySystemComponent())
 	{
-		return CachedAbilitySystemComponent;
+		UMHWCombatComponent* MutableThis = const_cast<UMHWCombatComponent*>(this);
+		if (MutableThis->CachedAbilitySystemComponent != OwnerASC)
+		{
+			MutableThis->CachedAbilitySystemComponent = OwnerASC;
+		}
+
+		return OwnerASC;
 	}
 
-	AActor* OwnerActor = GetOwner();
-	return OwnerActor ? UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwnerActor) : nullptr;
+	return CachedAbilitySystemComponent;
 }
 
 const UMHWCombatAttributeSet* UMHWCombatComponent::GetCombatAttributeSet() const
@@ -197,27 +211,7 @@ bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhy
 		EffectContext.AddSourceObject(SourceActor);
 	}
 
-	if (bHasDamageNumberWorldLocation)
-	{
-		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
-		{
-			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
-			{
-				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
-			}
-		}
-	}
-
-	if (!AttackDisplayName.IsEmpty())
-	{
-		if (FGameplayEffectContext* RawEffectContext = EffectContext.Get())
-		{
-			if (RawEffectContext->GetScriptStruct() == FMHWGameplayEffectContext::StaticStruct())
-			{
-				static_cast<FMHWGameplayEffectContext*>(RawEffectContext)->SetAttackDisplayName(AttackDisplayName);
-			}
-		}
-	}
+	ApplyDamageContextMetadata(EffectContext, bHasDamageNumberWorldLocation, DamageNumberWorldLocation, AttackDisplayName);
 
 	FGameplayEffectSpecHandle SpecHandle = SpecSourceASC->MakeOutgoingSpec(UMHWDamageGameplayEffect::StaticClass(), 1.0f, EffectContext);
 	if (!SpecHandle.IsValid())
@@ -231,20 +225,7 @@ bool UMHWCombatComponent::ApplyPhysicalDamage(AActor* SourceActor, const FMHWPhy
 		return false;
 	}
 
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::TrueRawAttack, DamageSpec.TrueRawAttack);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, DamageSpec.MotionValue);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, DamageSpec.MotionValueScale);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, DamageSpec.SharpnessMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, DamageSpec.CriticalChance);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, DamageSpec.PositiveCriticalMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, DamageSpec.NegativeCriticalMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, DamageSpec.CriticalMultiplierOverride);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::BounceMultiplier, DamageSpec.BounceMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::EnrageMultiplier, DamageSpec.EnrageMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::AilmentMultiplier, DamageSpec.AilmentMultiplier);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::DefenseRate, DamageSpec.DefenseRate);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::HitzoneValue, DamageSpec.HitzoneValue);
-	DamageSpecHandle->SetSetByCallerMagnitude(MHWDamageDataTags::AdditionalMultiplier, DamageSpec.AdditionalMultiplier);
+	ApplyDamageSpecSetByCallerMagnitudes(*DamageSpecHandle, DamageSpec);
 
 	TargetASC->ApplyGameplayEffectSpecToSelf(*DamageSpecHandle);
 	return true;
@@ -259,7 +240,7 @@ void UMHWCombatComponent::ResetVitalsToMax()
 bool UMHWCombatComponent::ApplyInitialAttributesEffect(bool bForceReapply)
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || !InitialAttributesEffectClass)
+	if (!ASC || !InitialAttributesEffectClass || !IsAbilitySystemReady(ASC))
 	{
 		return false;
 	}
@@ -373,6 +354,50 @@ AMHWDamageNumberActor* UMHWCombatComponent::SpawnPooledDamageNumberActor()
 	return nullptr;
 }
 
+void UMHWCombatComponent::ApplyDamageContextMetadata(
+	FGameplayEffectContextHandle& EffectContext,
+	const bool bHasDamageNumberWorldLocation,
+	const FVector& DamageNumberWorldLocation,
+	const FString& AttackDisplayName) const
+{
+	FGameplayEffectContext* RawEffectContext = EffectContext.Get();
+	if (!RawEffectContext || RawEffectContext->GetScriptStruct() != FMHWGameplayEffectContext::StaticStruct())
+	{
+		return;
+	}
+
+	FMHWGameplayEffectContext* MHWEffectContext = static_cast<FMHWGameplayEffectContext*>(RawEffectContext);
+	if (bHasDamageNumberWorldLocation)
+	{
+		MHWEffectContext->SetDamageNumberWorldLocation(DamageNumberWorldLocation);
+	}
+
+	if (!AttackDisplayName.IsEmpty())
+	{
+		MHWEffectContext->SetAttackDisplayName(AttackDisplayName);
+	}
+}
+
+void UMHWCombatComponent::ApplyDamageSpecSetByCallerMagnitudes(
+	FGameplayEffectSpec& EffectSpec,
+	const FMHWPhysicalDamageSpec& DamageSpec) const
+{
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::TrueRawAttack, DamageSpec.TrueRawAttack);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::MotionValue, DamageSpec.MotionValue);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::MotionValueScale, DamageSpec.MotionValueScale);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::SharpnessMultiplier, DamageSpec.SharpnessMultiplier);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::CriticalChance, DamageSpec.CriticalChance);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::PositiveCriticalMultiplier, DamageSpec.PositiveCriticalMultiplier);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::NegativeCriticalMultiplier, DamageSpec.NegativeCriticalMultiplier);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::CriticalMultiplierOverride, DamageSpec.CriticalMultiplierOverride);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::BounceMultiplier, DamageSpec.BounceMultiplier);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::EnrageMultiplier, DamageSpec.EnrageMultiplier);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::AilmentMultiplier, DamageSpec.AilmentMultiplier);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::DefenseRate, DamageSpec.DefenseRate);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::HitzoneValue, DamageSpec.HitzoneValue);
+	EffectSpec.SetSetByCallerMagnitude(MHWDamageDataTags::AdditionalMultiplier, DamageSpec.AdditionalMultiplier);
+}
+
 void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCriticalHitType CriticalHitType, bool bHasDamageNumberWorldLocation, const FVector& DamageNumberWorldLocation, const FString& AttackDisplayName)
 {
 	if (!bSpawnDamageNumberOnDamage || !DamageNumberActorClass)
@@ -394,15 +419,34 @@ void UMHWCombatComponent::SpawnDamageNumberActor(float DamageAmount, EMHWCritica
 	}
 }
 
-bool UMHWCombatComponent::TryInitializeFromOwner()
+UAbilitySystemComponent* UMHWCombatComponent::ResolveOwnerAbilitySystemComponent() const
 {
-	if (bAttributeDelegatesBound)
+	AActor* OwnerActor = GetOwner();
+	return OwnerActor ? UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwnerActor) : nullptr;
+}
+
+bool UMHWCombatComponent::IsAbilitySystemReady(UAbilitySystemComponent* ASC) const
+{
+	AActor* OwnerActor = GetOwner();
+	if (!ASC || !OwnerActor)
 	{
-		return true;
+		return false;
 	}
 
+	// Initial GE application depends on a fully initialized avatar pairing. Components can
+	// begin play before the pawn calls InitAbilityActorInfo, especially on monster pawns.
+	return ASC->GetAvatarActor() == OwnerActor;
+}
+
+bool UMHWCombatComponent::TryInitializeFromOwner()
+{
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC)
+	{
+		return false;
+	}
+
+	if (!IsAbilitySystemReady(ASC))
 	{
 		return false;
 	}
@@ -413,21 +457,60 @@ bool UMHWCombatComponent::TryInitializeFromOwner()
 		return false;
 	}
 
+	if (bAttributeDelegatesBound && BoundAttributeDelegatesASC == ASC)
+	{
+		return true;
+	}
+
+	if (bAttributeDelegatesBound)
+	{
+		// The owner ASC can appear later or change when actor info is rebuilt, so stale delegates must be removed first.
+		UnbindAttributeDelegates();
+	}
+
 	if (bApplyInitialAttributesEffectOnInitialize)
 	{
 		ApplyInitialAttributesEffect();
 	}
 
 	CachedAbilitySystemComponent = ASC;
-	ASC->GetGameplayAttributeValueChangeDelegate(UMHWCombatAttributeSet::GetHealthAttribute())
+	BoundAttributeDelegatesASC = ASC;
+	HealthAttributeChangedHandle = ASC->GetGameplayAttributeValueChangeDelegate(UMHWCombatAttributeSet::GetHealthAttribute())
 		.AddUObject(this, &ThisClass::HandleHealthAttributeChanged);
-	ASC->GetGameplayAttributeValueChangeDelegate(UMHWCombatAttributeSet::GetStaminaAttribute())
+	StaminaAttributeChangedHandle = ASC->GetGameplayAttributeValueChangeDelegate(UMHWCombatAttributeSet::GetStaminaAttribute())
 		.AddUObject(this, &ThisClass::HandleStaminaAttributeChanged);
-
 	bAttributeDelegatesBound = true;
 	LastStaminaConsumeTime = -StaminaRegenDelay;
 	BroadcastInitialAttributeState();
 	return true;
+}
+
+void UMHWCombatComponent::UnbindAttributeDelegates()
+{
+	if (!BoundAttributeDelegatesASC)
+	{
+		bAttributeDelegatesBound = false;
+		HealthAttributeChangedHandle.Reset();
+		StaminaAttributeChangedHandle.Reset();
+		return;
+	}
+
+	if (HealthAttributeChangedHandle.IsValid())
+	{
+		BoundAttributeDelegatesASC->GetGameplayAttributeValueChangeDelegate(UMHWCombatAttributeSet::GetHealthAttribute())
+			.Remove(HealthAttributeChangedHandle);
+	}
+
+	if (StaminaAttributeChangedHandle.IsValid())
+	{
+		BoundAttributeDelegatesASC->GetGameplayAttributeValueChangeDelegate(UMHWCombatAttributeSet::GetStaminaAttribute())
+			.Remove(StaminaAttributeChangedHandle);
+	}
+
+	BoundAttributeDelegatesASC = nullptr;
+	bAttributeDelegatesBound = false;
+	HealthAttributeChangedHandle.Reset();
+	StaminaAttributeChangedHandle.Reset();
 }
 
 void UMHWCombatComponent::HandleAutomaticStaminaRegen(float DeltaSeconds)

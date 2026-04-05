@@ -10,6 +10,32 @@
 #include "Character/MHWMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 
+namespace MHWAnimInstanceInternal
+{
+	static void DebugChargingState(const FColor& Color, const TCHAR* Message, const float Duration = 0.0f)
+	{
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, Duration, Color, Message);
+		}
+#endif
+	}
+
+	static void RemoveGameplayTagEventDelegate(
+		UAbilitySystemComponent* ASC,
+		const FGameplayTag& Tag,
+		FDelegateHandle& DelegateHandle)
+	{
+		if (!ASC || !DelegateHandle.IsValid())
+		{
+			return;
+		}
+
+		ASC->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::AnyCountChange).Remove(DelegateHandle);
+	}
+}
+
 UMHWAnimInstance::UMHWAnimInstance(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -77,42 +103,21 @@ void UMHWAnimInstance::SetChargeTurnYaw_Implementation(float TurnYaw)
 void UMHWAnimInstance::NativeBeginPlay()
 {
 	Super::NativeBeginPlay();
-	CurrentChargeYaw = 0.0f;
-	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
-	bIsCharging = false;
-	ResetFootLockRuntimeData();
-	if (AActor* OwningActor = GetOwningActor())
-	{
-		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor))
-		{
-			InitializeWithAbilitySystem(ASC);
-		}
-	}
+	ResetAnimationRuntimeState();
+	TryInitializeAbilitySystemFromOwner();
 }
 
 void UMHWAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	CurrentChargeYaw = 0.0f;
-	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
-	bIsCharging = false;
-	ResetFootLockRuntimeData();
-	if (AActor* OwningActor = GetOwningActor())
-	{
-		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor))
-		{
-			InitializeWithAbilitySystem(ASC);
-		}
-	}
+	ResetAnimationRuntimeState();
+	TryInitializeAbilitySystemFromOwner();
 }
 
 void UMHWAnimInstance::NativeUninitializeAnimation()
 {
 	UnbindFromAbilitySystem();
-	CurrentChargeYaw = 0.0f;
-	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
-	bIsCharging = false;
-	ResetFootLockRuntimeData();
+	ResetAnimationRuntimeState();
 	Super::NativeUninitializeAnimation();
 }
 
@@ -132,20 +137,35 @@ void UMHWAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	UpdateFootLockRuntimeData();
 }
 
-void UMHWAnimInstance::OnChargeTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
+void UMHWAnimInstance::OnChargeTagChanged(const FGameplayTag /*CallbackTag*/, int32 /*NewCount*/)
 {
 	UpdateChargingTypeFromTags();
 }
 
+void UMHWAnimInstance::ResetAnimationRuntimeState()
+{
+	CurrentChargeYaw = 0.0f;
+	CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
+	bIsCharging = false;
+	ResetFootLockRuntimeData();
+}
 
+void UMHWAnimInstance::TryInitializeAbilitySystemFromOwner()
+{
+	if (AActor* OwningActor = GetOwningActor())
+	{
+		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor))
+		{
+			InitializeWithAbilitySystem(ASC);
+		}
+	}
+}
 
 void UMHWAnimInstance::UpdateChargingTypeFromTags()
 {
 	const ECombatChargingType PreviousChargingType = CurrentCombatChargingType;
 
-	// 1. 尝试获取缓存的 ASC
 	UAbilitySystemComponent* ASC = CachedASC.Get();
-	
 	if (!ASC)
 	{
 		bIsCharging = false;
@@ -161,52 +181,38 @@ void UMHWAnimInstance::UpdateChargingTypeFromTags()
 		// 如果没在蓄力，直接重置并返回 (效率最高)
 		CurrentCombatChargingType = ECombatChargingType::CombatNotCharging;
 		CurrentChargeYaw = 0.0f; // 可选：结束时把偏航角归零，防止下次带入旧数据
-		
-		// 打印灰色：未蓄力
-		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Silver, TEXT("当前状态：未蓄力 (没有父级 Tag)")); }
+		MHWAnimInstanceInternal::DebugChargingState(FColor::Silver, TEXT("当前状态：未蓄力 (没有父级 Tag)"));
 		return;
 	}
 
-	// 2. 如果在蓄力，具体是哪一种？(优先级从高到低判断)
-	// (使用 HasMatchingGameplayTag 精确查询具体的子 Tag)
-	
 	if (ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging_XLZ3)) // 真蓄
 	{
 		CurrentCombatChargingType = ECombatChargingType::CombatChargingZLZ3;
-		// 打印红色：真蓄力
-		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Red, TEXT("当前状态：真蓄力斩 (XLZ3)")); }
+		MHWAnimInstanceInternal::DebugChargingState(FColor::Red, TEXT("当前状态：真蓄力斩 (XLZ3)"));
 	}
 	else if (ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging_XLZ2)) // 强蓄
 	{
 		CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ2;
-		// 打印橙色：强蓄力
-		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Orange, TEXT("当前状态：强蓄力斩 (XLZ2)")); }
+		MHWAnimInstanceInternal::DebugChargingState(FColor::Orange, TEXT("当前状态：强蓄力斩 (XLZ2)"));
 	}
 	else if (ASC->HasMatchingGameplayTag(MHWStateTags::Combat_Charging_XLZ)) // 普蓄
 	{
 		CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ1;
-		// 打印黄色：普蓄力
-		if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Yellow, TEXT("当前状态：普通蓄力斩 (XLZ1)")); }
+		MHWAnimInstanceInternal::DebugChargingState(FColor::Yellow, TEXT("当前状态：普通蓄力斩 (XLZ1)"));
 	}
 	else
 	{
-		// 阶段切换时可能会出现一帧父 Tag 还在、具体阶段 Tag 还没补上的情况。
-		// 这时保持上一次有效阶段，避免 3 段瞬间闪回 1 段。
+		// Stage tags can momentarily disappear during transitions; keep the last valid stage
+		// instead of flashing back to level 1 for a frame.
 		if (PreviousChargingType != ECombatChargingType::CombatNotCharging)
 		{
 			CurrentCombatChargingType = PreviousChargingType;
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Magenta, TEXT("Charging 阶段 Tag 短暂缺失，保持上一阶段"));
-			}
+			MHWAnimInstanceInternal::DebugChargingState(FColor::Magenta, TEXT("Charging 阶段 Tag 短暂缺失，保持上一阶段"), 0.5f);
 		}
 		else
 		{
 			CurrentCombatChargingType = ECombatChargingType::CombatChargingXLZ1;
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Magenta, TEXT("Charging 父级 Tag 已存在但没有具体阶段，默认使用 1段"));
-			}
+			MHWAnimInstanceInternal::DebugChargingState(FColor::Magenta, TEXT("Charging 父级 Tag 已存在但没有具体阶段，默认使用 1段"), 0.5f);
 		}
 	}
 }
@@ -215,29 +221,10 @@ void UMHWAnimInstance::UnbindFromAbilitySystem()
 {
 	if (UAbilitySystemComponent* ASC = CachedASC.Get())
 	{
-		if (ChargeParentTagDelegateHandle.IsValid())
-		{
-			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging, EGameplayTagEventType::AnyCountChange)
-				.Remove(ChargeParentTagDelegateHandle);
-		}
-
-		if (ChargeLevel1TagDelegateHandle.IsValid())
-		{
-			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ, EGameplayTagEventType::AnyCountChange)
-				.Remove(ChargeLevel1TagDelegateHandle);
-		}
-
-		if (ChargeLevel2TagDelegateHandle.IsValid())
-		{
-			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ2, EGameplayTagEventType::AnyCountChange)
-				.Remove(ChargeLevel2TagDelegateHandle);
-		}
-
-		if (ChargeLevel3TagDelegateHandle.IsValid())
-		{
-			ASC->RegisterGameplayTagEvent(MHWStateTags::Combat_Charging_XLZ3, EGameplayTagEventType::AnyCountChange)
-				.Remove(ChargeLevel3TagDelegateHandle);
-		}
+		MHWAnimInstanceInternal::RemoveGameplayTagEventDelegate(ASC, MHWStateTags::Combat_Charging, ChargeParentTagDelegateHandle);
+		MHWAnimInstanceInternal::RemoveGameplayTagEventDelegate(ASC, MHWStateTags::Combat_Charging_XLZ, ChargeLevel1TagDelegateHandle);
+		MHWAnimInstanceInternal::RemoveGameplayTagEventDelegate(ASC, MHWStateTags::Combat_Charging_XLZ2, ChargeLevel2TagDelegateHandle);
+		MHWAnimInstanceInternal::RemoveGameplayTagEventDelegate(ASC, MHWStateTags::Combat_Charging_XLZ3, ChargeLevel3TagDelegateHandle);
 	}
 
 	ChargeParentTagDelegateHandle.Reset();

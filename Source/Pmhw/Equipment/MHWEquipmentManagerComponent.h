@@ -71,9 +71,11 @@ public:
 private:
 	UMHWAbilitySystemComponent* GetAbilitySystemComponent() const;
 	
-	APawn* GetPawn();
+	APawn* GetPawn() const;
 	
 	UEnhancedInputLocalPlayerSubsystem* GetEnhancedInputSystem();
+	void AddInputMappingContext(const UMHWEquipmentDefinition* EquipmentCDO);
+	void RemoveInputMappingContext(const UMHWEquipmentDefinition* EquipmentCDO);
 
 	friend UMHWEquipmentManagerComponent;
 

@@ -3,8 +3,6 @@
 
 #include "Character/MHWHeroComponent.h"
 
-#include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "MHWGameplayTags.h"
 #include "AbilitySystem/MHWAbilitySystemComponent.h"
@@ -27,8 +25,125 @@ class UMHWPawnExtensionComponent;
 
 namespace MHWHero
 {
-	static const float LookYawRate = 300.0f;
-	static const float LookPitchRate = 165.0f;
+	enum class EAbilityInputPhase : uint8
+	{
+		Pressed,
+		Held,
+		Released
+	};
+
+	static UMHWAbilitySystemComponent* GetAbilitySystemFromPawn(APawn* Pawn)
+	{
+		if (!Pawn)
+		{
+			return nullptr;
+		}
+
+		if (UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+		{
+			return PawnExtComp->GetMHWAbilitySystemComponent();
+		}
+
+		return nullptr;
+	}
+
+	static bool ResolveInputTagSet(APawn* Pawn, const FGameplayTag& InputTag, FInputActionTagSet& OutInputTagSet)
+	{
+		if (!Pawn || !Pawn->Implements<UMHWCharacterInterface>())
+		{
+			return false;
+		}
+
+		UConfigManager* ConfigSystem = Pawn->GetGameInstance() ? Pawn->GetGameInstance()->GetSubsystem<UConfigManager>() : nullptr;
+		return ConfigSystem
+			&& ConfigSystem->InputActionMappingAsset
+			&& ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet);
+	}
+
+	static const FInputActionTagAndPriority* GetMappedTagForPhase(const FInputActionTagSet& InputTagSet, const EAbilityInputPhase Phase)
+	{
+		switch (Phase)
+		{
+		case EAbilityInputPhase::Pressed:
+			return &InputTagSet.InputTag;
+		case EAbilityInputPhase::Held:
+			return &InputTagSet.HoldTag;
+		case EAbilityInputPhase::Released:
+			return &InputTagSet.CompleteTag;
+		default:
+			return nullptr;
+		}
+	}
+
+	static void ForwardAbilityInputToASC(UMHWAbilitySystemComponent* AbilitySystem, const FGameplayTag& InputTag, const EAbilityInputPhase Phase)
+	{
+		if (!AbilitySystem)
+		{
+			return;
+		}
+
+		switch (Phase)
+		{
+		case EAbilityInputPhase::Pressed:
+			AbilitySystem->AbilityInputTagPressed(InputTag);
+			break;
+		case EAbilityInputPhase::Held:
+			AbilitySystem->AbilityInputTagHolded(InputTag);
+			break;
+		case EAbilityInputPhase::Released:
+			AbilitySystem->AbilityInputTagReleased(InputTag);
+			break;
+		default:
+			break;
+		}
+	}
+
+	static void ForwardMappedInputToStateTree(APawn* Pawn, const FInputActionTagAndPriority& MappedTag)
+	{
+		if (!Pawn || !Pawn->Implements<UMHWCharacterInterface>() || !MappedTag.Tag.IsValid())
+		{
+			return;
+		}
+
+		if (UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn))
+		{
+			StateTreeComp->SendStateTreeEvent(FStateTreeEvent(MappedTag.Tag));
+		}
+	}
+
+	static void ForwardMappedInputToPreInputBuffer(APawn* Pawn, const FInputActionTagAndPriority& MappedTag)
+	{
+		if (!Pawn || !Pawn->Implements<UMHWCharacterInterface>() || !MappedTag.Tag.IsValid())
+		{
+			return;
+		}
+
+		if (UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(Pawn))
+		{
+			PreInputComponent->BufferInput(MappedTag.Tag, MappedTag.Priority);
+		}
+	}
+
+	static void ForwardMappedInput(APawn* Pawn, const FGameplayTag& InputTag, const EAbilityInputPhase Phase)
+	{
+		ForwardAbilityInputToASC(GetAbilitySystemFromPawn(Pawn), InputTag, Phase);
+
+		FInputActionTagSet InputTagSet;
+		if (!ResolveInputTagSet(Pawn, InputTag, InputTagSet))
+		{
+			return;
+		}
+
+		const FInputActionTagAndPriority* MappedTag = GetMappedTagForPhase(InputTagSet, Phase);
+		if (!MappedTag || !MappedTag->Tag.IsValid())
+		{
+			return;
+		}
+
+		// GAS consumes the raw input tag, while StateTree and combo buffering consume the weapon-context mapped tag.
+		ForwardMappedInputToStateTree(Pawn, *MappedTag);
+		ForwardMappedInputToPreInputBuffer(Pawn, *MappedTag);
+	}
 }
 
 
@@ -75,6 +190,8 @@ void UMHWHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompon
 				UMHWInputComponent* MHWIC = Cast<UMHWInputComponent>(PlayerInputComponent);
 				if (ensureMsgf(MHWIC, TEXT("Unexpected Input Component class! The Gameplay Abilities will not be bound to their inputs. Change the input component to UMHWInputComponent or a subclass of it.")))
 				{
+					InputComp = MHWIC;
+
 					// Add the key mappings that may have been set by the player
 					/*MHWIC->AddInputMappings(InputConfig, Subsystem);*/
 
@@ -104,6 +221,12 @@ void UMHWHeroComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
+void UMHWHeroComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CleanupObservedTagListeners();
+	Super::EndPlay(EndPlayReason);
+}
+
 void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 {
 	//TODO；可能之后修改这个初始化的阶段
@@ -116,18 +239,14 @@ void UMHWHeroComponent::OnActorInitStateChanged(FGameplayTag CurrentState)
 			return;
 		}
 
-		const UMHWPawnData* PawnData = nullptr;
-
 		if (UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 		{
-			PawnData = PawnExtComp->GetPawnData<UMHWPawnData>();
-
 			// The player state holds the persistent data for this player (state that persists across deaths and multiple pawns).
 			// The ability system component and attribute sets live on the player state.
 			PawnExtComp->InitializeAbilitySystem(MHWPS->GetMHWAbilitySystemComponent(), MHWPS);
 		}
 
-		if (AMHWPlayerController* MHWPC = GetController<AMHWPlayerController>())
+		if (GetController<AMHWPlayerController>() != nullptr)
 		{
 			if (Pawn->InputComponent != nullptr)
 			{
@@ -180,6 +299,29 @@ void UMHWHeroComponent::BindObservedTagListener(const FGameplayTag TagToObserve,
 	}
 }
 
+void UMHWHeroComponent::CleanupObservedTagListeners()
+{
+	UMHWAbilitySystemComponent* ASC = CachedAbilitySystem.Get();
+	if (ASC)
+	{
+		if (bMovementBlockMoveTagListenerBound)
+		{
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Movement_BlockMove, EGameplayTagEventType::NewOrRemoved).Remove(MovementBlockMoveTagDelegateHandle);
+		}
+
+		if (bRotationBlockTagListenerBound)
+		{
+			ASC->RegisterGameplayTagEvent(MHWStateTags::Rotation_BlockRotation, EGameplayTagEventType::NewOrRemoved).Remove(RotationBlockTagDelegateHandle);
+		}
+	}
+
+	MovementBlockMoveTagDelegateHandle.Reset();
+	RotationBlockTagDelegateHandle.Reset();
+	bMovementBlockMoveTagListenerBound = false;
+	bRotationBlockTagListenerBound = false;
+	CachedAbilitySystem = nullptr;
+}
+
 void UMHWHeroComponent::ApplyObservedTagStates()
 {
 	APawn* Pawn = GetPawn<APawn>();
@@ -209,31 +351,10 @@ void UMHWHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
 {
 	if (APawn* Pawn = GetPawn<APawn>())
 	{
-		if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
-		{
-			if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetMHWAbilitySystemComponent())
-			{
-				MHWASC->AbilityInputTagPressed(InputTag);
-			}
-		}	
-		if (Pawn->Implements<UMHWCharacterInterface>())
-		{
-			UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn);
-			UConfigManager* ConfigSystem = Pawn->GetGameInstance()->GetSubsystem<UConfigManager>();
-			FInputActionTagSet OutInputTagSet;
-			if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
-				ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
-			{
-				if (OutInputTagSet.InputTag.Tag != FGameplayTag())
-				{
-					StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.InputTag.Tag));
-				}
-			}
-			UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(GetOuter());
-			PreInputComponent->BufferInput(OutInputTagSet.InputTag.Tag, OutInputTagSet.InputTag.Priority);
-		}
+		MHWHero::ForwardMappedInput(Pawn, InputTag, MHWHero::EAbilityInputPhase::Pressed);
 	}
 }
+
 void UMHWHeroComponent::Input_AbilityInputTagHold(FGameplayTag InputTag)
 {
 	APawn* Pawn = GetPawn<APawn>();
@@ -242,29 +363,7 @@ void UMHWHeroComponent::Input_AbilityInputTagHold(FGameplayTag InputTag)
 		return;
 	}
 
-	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
-	{
-		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetMHWAbilitySystemComponent())
-		{
-			MHWASC->AbilityInputTagHolded(InputTag);
-		}
-	}	
-	if (Pawn->Implements<UMHWCharacterInterface>())
-	{
-		UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn);
-		UConfigManager* ConfigSystem = Pawn->GetGameInstance()->GetSubsystem<UConfigManager>();
-		FInputActionTagSet OutInputTagSet;
-		if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
-			ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
-		{
-			if (OutInputTagSet.HoldTag.Tag != FGameplayTag())
-			{
-				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.HoldTag.Tag));
-			}
-		}
-		UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(GetOuter());
-		PreInputComponent->BufferInput(OutInputTagSet.HoldTag.Tag, OutInputTagSet.HoldTag.Priority);
-	}
+	MHWHero::ForwardMappedInput(Pawn, InputTag, MHWHero::EAbilityInputPhase::Held);
 }
 
 void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
@@ -275,29 +374,7 @@ void UMHWHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
 		return;
 	}
 
-	if (const UMHWPawnExtensionComponent* PawnExtComp = UMHWPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
-	{
-		if (UMHWAbilitySystemComponent* MHWASC = PawnExtComp->GetMHWAbilitySystemComponent())
-		{
-			MHWASC->AbilityInputTagReleased(InputTag);
-		}
-	}	
-	if (Pawn->Implements<UMHWCharacterInterface>())
-	{
-		UStateTreeComponent* StateTreeComp = IMHWCharacterInterface::Execute_GetStateTreeComponent(Pawn);
-		UConfigManager* ConfigSystem = Pawn->GetGameInstance()->GetSubsystem<UConfigManager>();
-		FInputActionTagSet OutInputTagSet;
-		if (ConfigSystem && ConfigSystem->InputActionMappingAsset&&
-			ConfigSystem->InputActionMappingAsset->GetTagSetByInput(InputTag, OutInputTagSet))
-		{
-			if (OutInputTagSet.CompleteTag.Tag != FGameplayTag())
-			{
-				StateTreeComp->SendStateTreeEvent(FStateTreeEvent(OutInputTagSet.CompleteTag.Tag));
-			}
-		}
-		UMHWComboPreInputComponent* PreInputComponent = IMHWCharacterInterface::Execute_GetComboPreInputComponent(GetOuter());
-		PreInputComponent->BufferInput(OutInputTagSet.CompleteTag.Tag, OutInputTagSet.CompleteTag.Priority);
-	}
+	MHWHero::ForwardMappedInput(Pawn, InputTag, MHWHero::EAbilityInputPhase::Released);
 }
 
 
@@ -328,8 +405,10 @@ void UMHWHeroComponent::Input_Move(const FInputActionValue& InputActionValue)
 
 		const FRotator MovementRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
 		
-		UMHWInputComponent* MHWInputComp = GetMHWInputComponent();
-		MHWInputComp->RawMoveInput = MovementRotation.RotateVector(FVector(Value.X, Value.Y, 0.f));
+		if (UMHWInputComponent* MHWInputComp = GetMHWInputComponent())
+		{
+			MHWInputComp->RawMoveInput = MovementRotation.RotateVector(FVector(Value.X, Value.Y, 0.f));
+		}
 		
 		if (Value.X != 0.0f)
 		{
@@ -395,9 +474,10 @@ UMHWInputComponent* UMHWHeroComponent::GetMHWInputComponent()
 {
 	if (!IsValid(InputComp))
 	{
-		UMHWInputComponent* MHWInputComp = Cast<UMHWInputComponent>(GetPawn<APawn>()->GetComponentByClass(UMHWInputComponent::StaticClass()));
-		InputComp = MHWInputComp;
+		if (APawn* Pawn = GetPawn<APawn>())
+		{
+			InputComp = Pawn->FindComponentByClass<UMHWInputComponent>();
+		}
 	}
 	return InputComp;
 }
-

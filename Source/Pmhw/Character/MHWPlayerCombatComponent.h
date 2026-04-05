@@ -53,5 +53,6 @@ public:
 	FMHWPhysicalAttackPanel PhysicalAttackPanel;
 
 private:
+	void ApplyAttackPanelBonusInternal(const FMHWPhysicalAttackPanelBonus& Bonus, float Sign);
 	void NormalizePhysicalAttackPanel();
 };

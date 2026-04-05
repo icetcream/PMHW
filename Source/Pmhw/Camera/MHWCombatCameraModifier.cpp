@@ -2,6 +2,31 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatCameraModifier)
 
+namespace CombatCameraModifier
+{
+	static void SetMotionTargets(FMHWCameraMotionRuntimeState& CameraMotionState, const FMHWCameraMotionSettings& InMotionSettings)
+	{
+		CameraMotionState.StartLocalOffset = CameraMotionState.CurrentLocalOffset;
+		CameraMotionState.StartRotationOffset = CameraMotionState.CurrentRotationOffset;
+		CameraMotionState.StartFOVOffset = CameraMotionState.CurrentFOVOffset;
+
+		CameraMotionState.TargetLocalOffset = InMotionSettings.LocalOffset;
+		CameraMotionState.TargetRotationOffset = InMotionSettings.RotationOffset;
+		CameraMotionState.TargetFOVOffset = InMotionSettings.FOVOffset;
+		CameraMotionState.BlendElapsed = 0.0f;
+		CameraMotionState.BlendDuration = FMath::Max(0.0f, InMotionSettings.BlendDuration);
+		CameraMotionState.bHasActiveBlend = true;
+	}
+
+	static void SnapMotionToTarget(FMHWCameraMotionRuntimeState& CameraMotionState)
+	{
+		CameraMotionState.CurrentLocalOffset = CameraMotionState.TargetLocalOffset;
+		CameraMotionState.CurrentRotationOffset = CameraMotionState.TargetRotationOffset;
+		CameraMotionState.CurrentFOVOffset = CameraMotionState.TargetFOVOffset;
+		CameraMotionState.bHasActiveBlend = false;
+	}
+}
+
 void UMHWCombatCameraModifier::PlaySpringShake(const FMHWCameraSpringShakeSettings& InShakeSettings)
 {
 	if (!InShakeSettings.IsEnabled())
@@ -16,23 +41,11 @@ void UMHWCombatCameraModifier::PlaySpringShake(const FMHWCameraSpringShakeSettin
 
 void UMHWCombatCameraModifier::ApplyCameraMotion(const FMHWCameraMotionSettings& InMotionSettings)
 {
-	CameraMotionState.StartLocalOffset = CameraMotionState.CurrentLocalOffset;
-	CameraMotionState.StartRotationOffset = CameraMotionState.CurrentRotationOffset;
-	CameraMotionState.StartFOVOffset = CameraMotionState.CurrentFOVOffset;
-
-	CameraMotionState.TargetLocalOffset = InMotionSettings.LocalOffset;
-	CameraMotionState.TargetRotationOffset = InMotionSettings.RotationOffset;
-	CameraMotionState.TargetFOVOffset = InMotionSettings.FOVOffset;
-	CameraMotionState.BlendElapsed = 0.0f;
-	CameraMotionState.BlendDuration = FMath::Max(0.0f, InMotionSettings.BlendDuration);
-	CameraMotionState.bHasActiveBlend = true;
+	CombatCameraModifier::SetMotionTargets(CameraMotionState, InMotionSettings);
 
 	if (CameraMotionState.BlendDuration <= 0.0f)
 	{
-		CameraMotionState.CurrentLocalOffset = CameraMotionState.TargetLocalOffset;
-		CameraMotionState.CurrentRotationOffset = CameraMotionState.TargetRotationOffset;
-		CameraMotionState.CurrentFOVOffset = CameraMotionState.TargetFOVOffset;
-		CameraMotionState.bHasActiveBlend = false;
+		CombatCameraModifier::SnapMotionToTarget(CameraMotionState);
 	}
 }
 
@@ -70,10 +83,7 @@ void UMHWCombatCameraModifier::UpdateCameraMotion(const float DeltaTime)
 
 	if (CameraMotionState.BlendDuration <= 0.0f)
 	{
-		CameraMotionState.CurrentLocalOffset = CameraMotionState.TargetLocalOffset;
-		CameraMotionState.CurrentRotationOffset = CameraMotionState.TargetRotationOffset;
-		CameraMotionState.CurrentFOVOffset = CameraMotionState.TargetFOVOffset;
-		CameraMotionState.bHasActiveBlend = false;
+		CombatCameraModifier::SnapMotionToTarget(CameraMotionState);
 		return;
 	}
 

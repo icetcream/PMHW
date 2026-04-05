@@ -40,6 +40,8 @@ struct FSTT_ComboMontagePlayInstanceData
 	UPROPERTY(EditAnywhere, Category = "Input|Montage")
 	FName StartSection = NAME_None;
 
+	// Montage delegates can outlive StateTree instance storage, so task callback state
+	// stays on the heap instead of capturing addresses inside InstanceData.
 	TSharedPtr<FComboMontagePlayRuntimeState> RuntimeState;
 	TWeakObjectPtr<UAnimInstance> CachedAnimInstance = nullptr;
 

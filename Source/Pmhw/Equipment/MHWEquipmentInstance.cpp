@@ -3,16 +3,46 @@
 
 #include "Equipment/MHWEquipmentInstance.h"
 
-#include "EnhancedInputSubsystems.h"
 #include "Character/MHWPlayerCombatComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Data/InputActionMappingAsset.h"
 #include "Data/MHWAttackDataTable.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Equipment/MHWEquipmentDefinition.h"
 #include "GameFramework/Character.h"
-#include "Player/MHWLocalPlayer.h"
 #include "Subsystems/ConfigManager.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWEquipmentInstance)
+
+namespace EquipmentInstance
+{
+	static USkeletalMeshComponent* GetCharacterMesh(APawn* Pawn)
+	{
+		if (ACharacter* Character = Cast<ACharacter>(Pawn))
+		{
+			return Character->GetMesh();
+		}
+
+		return nullptr;
+	}
+
+	static UMHWPlayerCombatComponent* GetPlayerCombatComponent(APawn* Pawn)
+	{
+		return Pawn ? Pawn->FindComponentByClass<UMHWPlayerCombatComponent>() : nullptr;
+	}
+
+	static UConfigManager* GetConfigManager(UWorld* World)
+	{
+		if (!World)
+		{
+			return nullptr;
+		}
+
+		UGameInstance* GameInstance = World->GetGameInstance();
+		return GameInstance ? GameInstance->GetSubsystem<UConfigManager>() : nullptr;
+	}
+}
 
 class UClass;
 class USceneComponent;
@@ -44,25 +74,26 @@ APawn* UMHWEquipmentInstance::GetPawn() const
 
 APawn* UMHWEquipmentInstance::GetTypedPawn(TSubclassOf<APawn> PawnType) const
 {
-	APawn* Result = nullptr;
-	if (UClass* ActualPawnType = PawnType)
+	APawn* OwningPawn = GetPawn();
+	if (!OwningPawn)
 	{
-		if (GetOuter()->IsA(ActualPawnType))
-		{
-			Result = Cast<APawn>(GetOuter());
-		}
+		return nullptr;
 	}
 
-	return Result;
+	if (UClass* ActualPawnType = PawnType)
+	{
+		return OwningPawn->IsA(ActualPawnType) ? OwningPawn : nullptr;
+	}
+
+	return OwningPawn;
 }
 
 void UMHWEquipmentInstance::UpdateAttachment(FName NewSocketName)
 {
 	if (SpawnedActor)
 	{
-		if (ACharacter* MyCharacter = Cast<ACharacter>(GetPawn()))
+		if (USkeletalMeshComponent* AttachTarget = EquipmentInstance::GetCharacterMesh(GetPawn()))
 		{
-			USkeletalMeshComponent* AttachTarget = MyCharacter->GetMesh();
 			SpawnedActor->AttachToComponent(AttachTarget, FAttachmentTransformRules::KeepRelativeTransform, NewSocketName);
 		}
 	}
@@ -225,13 +256,10 @@ void UMHWEquipmentInstance::OnEquipped()
 		{
 			if (EquipmentDefinition->PlayerAttackPanelBonus.HasAnyBonus())
 			{
-				if (APawn* OwningPawn = GetPawn())
+				if (UMHWPlayerCombatComponent* PlayerCombatComponent = EquipmentInstance::GetPlayerCombatComponent(GetPawn()))
 				{
-					if (UMHWPlayerCombatComponent* PlayerCombatComponent = OwningPawn->FindComponentByClass<UMHWPlayerCombatComponent>())
-					{
-						PlayerCombatComponent->ApplyAttackPanelBonus(EquipmentDefinition->PlayerAttackPanelBonus);
-						bAppliedPlayerAttackPanelBonus = true;
-					}
+					PlayerCombatComponent->ApplyAttackPanelBonus(EquipmentDefinition->PlayerAttackPanelBonus);
+					bAppliedPlayerAttackPanelBonus = true;
 				}
 			}
 		}
@@ -241,26 +269,17 @@ void UMHWEquipmentInstance::OnEquipped()
 	{
 		if (EquipmentDefinition->InputActionMappingAsset)
 		{
-			if (UWorld* World = GetWorld())
+			if (UConfigManager* ConfigManager = EquipmentInstance::GetConfigManager(GetWorld()))
 			{
-				if (UGameInstance* GameInstance = World->GetGameInstance())
-				{
-					if (UConfigManager* ConfigManager = GameInstance->GetSubsystem<UConfigManager>())
-					{
-						ConfigManager->SetInputActionMappingAsset(EquipmentDefinition->InputActionMappingAsset);
-					}
-				}
+				ConfigManager->SetInputActionMappingAsset(EquipmentDefinition->InputActionMappingAsset);
 			}
 		}
 
 		if (EquipmentDefinition->LinkedAnimLayerClass)
 		{
-			if (ACharacter* Character = Cast<ACharacter>(GetPawn()))
+			if (USkeletalMeshComponent* Mesh = EquipmentInstance::GetCharacterMesh(GetPawn()))
 			{
-				if (USkeletalMeshComponent* Mesh = Character->GetMesh())
-				{
-					Mesh->LinkAnimClassLayers(EquipmentDefinition->LinkedAnimLayerClass);
-				}
+				Mesh->LinkAnimClassLayers(EquipmentDefinition->LinkedAnimLayerClass);
 			}
 		}
 	}
@@ -276,12 +295,9 @@ void UMHWEquipmentInstance::OnUnequipped()
 	{
 		if (EquipmentDefinition)
 		{
-			if (APawn* OwningPawn = GetPawn())
+			if (UMHWPlayerCombatComponent* PlayerCombatComponent = EquipmentInstance::GetPlayerCombatComponent(GetPawn()))
 			{
-				if (UMHWPlayerCombatComponent* PlayerCombatComponent = OwningPawn->FindComponentByClass<UMHWPlayerCombatComponent>())
-				{
-					PlayerCombatComponent->RemoveAttackPanelBonus(EquipmentDefinition->PlayerAttackPanelBonus);
-				}
+				PlayerCombatComponent->RemoveAttackPanelBonus(EquipmentDefinition->PlayerAttackPanelBonus);
 			}
 		}
 
@@ -292,28 +308,19 @@ void UMHWEquipmentInstance::OnUnequipped()
 	{
 		if (EquipmentDefinition->LinkedAnimLayerClass)
 		{
-			if (ACharacter* Character = Cast<ACharacter>(GetPawn()))
+			if (USkeletalMeshComponent* Mesh = EquipmentInstance::GetCharacterMesh(GetPawn()))
 			{
-				if (USkeletalMeshComponent* Mesh = Character->GetMesh())
-				{
-					Mesh->UnlinkAnimClassLayers(EquipmentDefinition->LinkedAnimLayerClass);
-				}
+				Mesh->UnlinkAnimClassLayers(EquipmentDefinition->LinkedAnimLayerClass);
 			}
 		}
 
 		if (EquipmentDefinition->InputActionMappingAsset)
 		{
-			if (UWorld* World = GetWorld())
+			if (UConfigManager* ConfigManager = EquipmentInstance::GetConfigManager(GetWorld()))
 			{
-				if (UGameInstance* GameInstance = World->GetGameInstance())
+				if (ConfigManager->InputActionMappingAsset == EquipmentDefinition->InputActionMappingAsset)
 				{
-					if (UConfigManager* ConfigManager = GameInstance->GetSubsystem<UConfigManager>())
-					{
-						if (ConfigManager->InputActionMappingAsset == EquipmentDefinition->InputActionMappingAsset)
-						{
-							ConfigManager->SetInputActionMappingAsset(nullptr);
-						}
-					}
+					ConfigManager->SetInputActionMappingAsset(nullptr);
 				}
 			}
 		}

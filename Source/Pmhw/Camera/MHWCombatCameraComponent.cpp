@@ -8,6 +8,41 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(MHWCombatCameraComponent)
 
+namespace CombatCameraComponent
+{
+	static void SetBlendTargets(FMHWCombatCameraBlendState& BlendState, const FMHWCombatCameraArmMotionSettings& InMotionSettings)
+	{
+		BlendState.StartArmLengthOffset = BlendState.CurrentArmLengthOffset;
+		BlendState.TargetArmLengthOffset = InMotionSettings.ArmLengthOffset;
+
+		BlendState.StartSocketOffset = BlendState.CurrentSocketOffset;
+		BlendState.TargetSocketOffset = InMotionSettings.SocketOffset;
+
+		BlendState.StartTargetOffset = BlendState.CurrentTargetOffset;
+		BlendState.TargetTargetOffset = InMotionSettings.TargetOffset;
+
+		BlendState.StartBoomRotationOffset = BlendState.CurrentBoomRotationOffset;
+		BlendState.TargetBoomRotationOffset = InMotionSettings.BoomRotationOffset;
+
+		BlendState.StartFOVOffset = BlendState.CurrentFOVOffset;
+		BlendState.TargetFOVOffset = InMotionSettings.FOVOffset;
+
+		BlendState.BlendElapsed = 0.0f;
+		BlendState.BlendDuration = FMath::Max(0.0f, InMotionSettings.BlendDuration);
+		BlendState.bHasActiveBlend = true;
+	}
+
+	static void SnapBlendToTarget(FMHWCombatCameraBlendState& BlendState)
+	{
+		BlendState.CurrentArmLengthOffset = BlendState.TargetArmLengthOffset;
+		BlendState.CurrentSocketOffset = BlendState.TargetSocketOffset;
+		BlendState.CurrentTargetOffset = BlendState.TargetTargetOffset;
+		BlendState.CurrentBoomRotationOffset = BlendState.TargetBoomRotationOffset;
+		BlendState.CurrentFOVOffset = BlendState.TargetFOVOffset;
+		BlendState.bHasActiveBlend = false;
+	}
+}
+
 UMHWCombatCameraComponent::UMHWCombatCameraComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -26,6 +61,15 @@ void UMHWCombatCameraComponent::TickComponent(const float DeltaTime, const ELeve
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (!CachedSpringArm.IsValid() || !CachedCamera.IsValid() || !bDefaultsCached)
+	{
+		ResolveCameraReferences();
+		if (!bDefaultsCached)
+		{
+			CacheDefaultCameraState();
+		}
+	}
+
 	UpdateBlendState(DeltaTime);
 	ApplyCurrentStateToComponents();
 }
@@ -38,33 +82,11 @@ void UMHWCombatCameraComponent::ApplyCameraMotion(const FMHWCombatCameraArmMotio
 		CacheDefaultCameraState();
 	}
 
-	BlendState.StartArmLengthOffset = BlendState.CurrentArmLengthOffset;
-	BlendState.TargetArmLengthOffset = InMotionSettings.ArmLengthOffset;
-
-	BlendState.StartSocketOffset = BlendState.CurrentSocketOffset;
-	BlendState.TargetSocketOffset = InMotionSettings.SocketOffset;
-
-	BlendState.StartTargetOffset = BlendState.CurrentTargetOffset;
-	BlendState.TargetTargetOffset = InMotionSettings.TargetOffset;
-
-	BlendState.StartBoomRotationOffset = BlendState.CurrentBoomRotationOffset;
-	BlendState.TargetBoomRotationOffset = InMotionSettings.BoomRotationOffset;
-
-	BlendState.StartFOVOffset = BlendState.CurrentFOVOffset;
-	BlendState.TargetFOVOffset = InMotionSettings.FOVOffset;
-
-	BlendState.BlendElapsed = 0.0f;
-	BlendState.BlendDuration = FMath::Max(0.0f, InMotionSettings.BlendDuration);
-	BlendState.bHasActiveBlend = true;
+	CombatCameraComponent::SetBlendTargets(BlendState, InMotionSettings);
 
 	if (BlendState.BlendDuration <= 0.0f)
 	{
-		BlendState.CurrentArmLengthOffset = BlendState.TargetArmLengthOffset;
-		BlendState.CurrentSocketOffset = BlendState.TargetSocketOffset;
-		BlendState.CurrentTargetOffset = BlendState.TargetTargetOffset;
-		BlendState.CurrentBoomRotationOffset = BlendState.TargetBoomRotationOffset;
-		BlendState.CurrentFOVOffset = BlendState.TargetFOVOffset;
-		BlendState.bHasActiveBlend = false;
+		CombatCameraComponent::SnapBlendToTarget(BlendState);
 	}
 }
 
@@ -88,6 +110,12 @@ void UMHWCombatCameraComponent::ClearCameraMotion(const float BlendOutDuration)
 
 void UMHWCombatCameraComponent::SnapToDefaultCamera()
 {
+	ResolveCameraReferences();
+	if (!bDefaultsCached)
+	{
+		CacheDefaultCameraState();
+	}
+
 	BlendState = FMHWCombatCameraBlendState();
 	ApplyCurrentStateToComponents();
 }
@@ -142,7 +170,7 @@ void UMHWCombatCameraComponent::ResolveCameraReferences()
 
 void UMHWCombatCameraComponent::CacheDefaultCameraState()
 {
-	bDefaultsCached = true;
+	bool bHasResolvedAnyDefaults = false;
 
 	if (USpringArmComponent* SpringArm = CachedSpringArm.Get())
 	{
@@ -150,12 +178,16 @@ void UMHWCombatCameraComponent::CacheDefaultCameraState()
 		DefaultSocketOffset = SpringArm->SocketOffset;
 		DefaultTargetOffset = SpringArm->TargetOffset;
 		DefaultBoomRotation = SpringArm->GetRelativeRotation();
+		bHasResolvedAnyDefaults = true;
 	}
 
 	if (UCameraComponent* Camera = CachedCamera.Get())
 	{
 		DefaultCameraFOV = Camera->FieldOfView;
+		bHasResolvedAnyDefaults = true;
 	}
+
+	bDefaultsCached = bHasResolvedAnyDefaults;
 }
 
 void UMHWCombatCameraComponent::UpdateBlendState(const float DeltaTime)
@@ -167,12 +199,7 @@ void UMHWCombatCameraComponent::UpdateBlendState(const float DeltaTime)
 
 	if (BlendState.BlendDuration <= 0.0f)
 	{
-		BlendState.CurrentArmLengthOffset = BlendState.TargetArmLengthOffset;
-		BlendState.CurrentSocketOffset = BlendState.TargetSocketOffset;
-		BlendState.CurrentTargetOffset = BlendState.TargetTargetOffset;
-		BlendState.CurrentBoomRotationOffset = BlendState.TargetBoomRotationOffset;
-		BlendState.CurrentFOVOffset = BlendState.TargetFOVOffset;
-		BlendState.bHasActiveBlend = false;
+		CombatCameraComponent::SnapBlendToTarget(BlendState);
 		return;
 	}
 

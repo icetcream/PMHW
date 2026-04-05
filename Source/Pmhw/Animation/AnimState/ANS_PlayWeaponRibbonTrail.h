@@ -47,5 +47,7 @@ protected:
 private:
 	USkeletalMeshComponent* ResolveWeaponMesh(USkeletalMeshComponent* MeshComp) const;
 
+	// AnimNotifyState instances are shared by the animation asset, so trail components
+	// must be tracked per weapon mesh rather than stored as a single pointer.
 	TMap<TObjectKey<USkeletalMeshComponent>, TWeakObjectPtr<UNiagaraComponent>> ActiveTrailComponents;
 };

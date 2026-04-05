@@ -6,6 +6,41 @@
 #include "Equipment/MHWEquipmentManagerComponent.h"
 #include "Interface/MHWCharacterInterface.h"
 
+namespace WeaponEquipActionNotify
+{
+	static AActor* GetOwnerActor(USkeletalMeshComponent* MeshComp)
+	{
+		return MeshComp ? MeshComp->GetOwner() : nullptr;
+	}
+
+	static UMHWEquipmentManagerComponent* GetEquipmentManager(AActor* OwnerActor)
+	{
+		if (!OwnerActor || !OwnerActor->Implements<UMHWCharacterInterface>())
+		{
+			return nullptr;
+		}
+
+		return const_cast<UMHWEquipmentManagerComponent*>(IMHWCharacterInterface::Execute_GetEquipmentManagerComponent(OwnerActor));
+	}
+
+	static UMHWEquipmentInstance* GetWeaponInstance(AActor* OwnerActor, TSubclassOf<UMHWEquipmentInstance> WeaponInstanceClass)
+	{
+		UMHWEquipmentManagerComponent* EquipmentManager = GetEquipmentManager(OwnerActor);
+		if (!EquipmentManager)
+		{
+			return nullptr;
+		}
+
+		TSubclassOf<UMHWEquipmentInstance> QueryType = WeaponInstanceClass;
+		if (!QueryType)
+		{
+			QueryType = UMHWEquipmentInstance::StaticClass();
+		}
+
+		return EquipmentManager->GetFirstInstanceOfType(QueryType);
+	}
+}
+
 UAN_WeaponEquipAction::UAN_WeaponEquipAction()
 {
 }
@@ -15,31 +50,17 @@ void UAN_WeaponEquipAction::Notify(USkeletalMeshComponent* MeshComp, UAnimSequen
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	if (!MeshComp)
-	{
-		return;
-	}
-
-	AActor* Owner = MeshComp->GetOwner();
+	AActor* Owner = WeaponEquipActionNotify::GetOwnerActor(MeshComp);
 	if (!Owner)
 	{
 		return;
 	}
 
-	if (bUpdateWeaponSocket && Owner->Implements<UMHWCharacterInterface>())
+	if (bUpdateWeaponSocket)
 	{
-		if (UMHWEquipmentManagerComponent* EquipmentManager = const_cast<UMHWEquipmentManagerComponent*>(
-			IMHWCharacterInterface::Execute_GetEquipmentManagerComponent(Owner)))
+		if (UMHWEquipmentInstance* EquipmentInstance = WeaponEquipActionNotify::GetWeaponInstance(Owner, WeaponInstanceClass))
 		{
-			TSubclassOf<UMHWEquipmentInstance> QueryType = WeaponInstanceClass;
-			if (!QueryType)
-			{
-				QueryType = UMHWEquipmentInstance::StaticClass();
-			}
-			if (UMHWEquipmentInstance* EquipmentInstance = EquipmentManager->GetFirstInstanceOfType(QueryType))
-			{
-				EquipmentInstance->UpdateAttachment(TargetWeaponSocket);
-			}
+			EquipmentInstance->UpdateAttachment(TargetWeaponSocket);
 		}
 	}
 
@@ -61,8 +82,6 @@ void UAN_WeaponEquipAction::Notify(USkeletalMeshComponent* MeshComp, UAnimSequen
 		}
 	}
 }
-
-
 
 FString UAN_WeaponEquipAction::GetNotifyName_Implementation() const
 {
