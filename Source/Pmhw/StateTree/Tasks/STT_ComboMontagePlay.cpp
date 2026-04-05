@@ -30,6 +30,18 @@ namespace ComboMontagePlayTask
 		return IMHWCharacterInterface::Execute_GetAttackComponent(InActor);
 	}
 
+	static void ResetInstanceData(FSTT_ComboMontagePlayInstanceData& InstanceData)
+	{
+		InstanceData.RuntimeState.Reset();
+		InstanceData.CachedAnimInstance = nullptr;
+		InstanceData.PlayedMontageLength = 0.0f;
+		InstanceData.LastMontagePosition = 0.0f;
+		InstanceData.ActiveMotionWarpingName = NAME_None;
+		InstanceData.bMontageStarted = false;
+		InstanceData.bAppliedMotionWarping = false;
+		InstanceData.bAppliedAttackSpecTagOverride = false;
+	}
+
 	static void UnbindMontageDelegates(UAnimInstance* AnimInstance, UAnimMontage* Montage)
 	{
 		if (!AnimInstance || !Montage)
@@ -159,16 +171,7 @@ namespace ComboMontagePlayTask
 	{
 		if (!Character)
 		{
-			InstanceData.CachedAnimInstance = nullptr;
-			InstanceData.PlayedMontageLength = 0.0f;
-			InstanceData.LastMontagePosition = 0.0f;
-			InstanceData.ActiveMotionWarpingName = NAME_None;
-			InstanceData.bMontageStarted = false;
-			InstanceData.bMontageEnded = false;
-			InstanceData.bMontageInterrupted = false;
-			InstanceData.bInterruptedCleanupDone = false;
-			InstanceData.bAppliedMotionWarping = false;
-			InstanceData.bAppliedAttackSpecTagOverride = false;
+			ResetInstanceData(InstanceData);
 			return;
 		}
 
@@ -196,16 +199,7 @@ namespace ComboMontagePlayTask
 			bClearPreInputOnExit,
 			bDisablePreInputOnExit);
 
-		InstanceData.CachedAnimInstance = nullptr;
-		InstanceData.PlayedMontageLength = 0.0f;
-		InstanceData.LastMontagePosition = 0.0f;
-		InstanceData.ActiveMotionWarpingName = NAME_None;
-		InstanceData.bMontageStarted = false;
-		InstanceData.bMontageEnded = false;
-		InstanceData.bMontageInterrupted = false;
-		InstanceData.bInterruptedCleanupDone = false;
-		InstanceData.bAppliedMotionWarping = false;
-		InstanceData.bAppliedAttackSpecTagOverride = false;
+		ResetInstanceData(InstanceData);
 	}
 
 	static bool TryConsumeConfiguredStamina(AMHWCharacter* Character, const FGameplayTag& AttackSpecTag)
@@ -339,22 +333,15 @@ FSTT_ComboMontagePlay::FSTT_ComboMontagePlay()
 EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& /*Transition*/) const
 {
 	FSTT_ComboMontagePlayInstanceData& InstanceData = Context.GetInstanceData<FSTT_ComboMontagePlayInstanceData>(*this);
-	InstanceData.CachedAnimInstance = nullptr;
-	InstanceData.PlayedMontageLength = 0.0f;
-	InstanceData.LastMontagePosition = 0.0f;
-	InstanceData.ActiveMotionWarpingName = NAME_None;
-	InstanceData.bMontageStarted = false;
-	InstanceData.bMontageEnded = false;
-	InstanceData.bMontageInterrupted = false;
-	InstanceData.bInterruptedCleanupDone = false;
-	InstanceData.bAppliedMotionWarping = false;
-	InstanceData.bAppliedAttackSpecTagOverride = false;
+	ComboMontagePlayTask::ResetInstanceData(InstanceData);
 
 	AMHWCharacter* Character = InstanceData.MHWCharacter;
 	if (!Character || !ComboMontage)
 	{
 		return EStateTreeRunStatus::Failed;
 	}
+
+	InstanceData.RuntimeState = MakeShared<FComboMontagePlayRuntimeState>();
 
 	if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(Character))
 	{
@@ -449,9 +436,6 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 	InstanceData.PlayedMontageLength = PlayedLength;
 	InstanceData.LastMontagePosition = AnimInstance->Montage_GetPosition(ComboMontage);
 	InstanceData.bMontageStarted = true;
-	InstanceData.bMontageEnded = false;
-	InstanceData.bMontageInterrupted = false;
-	InstanceData.bInterruptedCleanupDone = false;
 
 	if (bUsePendingChargeLevel)
 	{
@@ -480,27 +464,25 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 		}
 	}
 
+	const TSharedPtr<FComboMontagePlayRuntimeState> RuntimeState = InstanceData.RuntimeState;
+
 	FOnMontageBlendingOutStarted BlendingOutDelegate;
-	BlendingOutDelegate.BindLambda(
+	BlendingOutDelegate.BindWeakLambda(
+		Character,
 		[CharacterPtr = TWeakObjectPtr<AMHWCharacter>(Character),
-		 MontageEndedPtr = &InstanceData.bMontageEnded,
-		 MontageInterruptedPtr = &InstanceData.bMontageInterrupted,
+		 RuntimeState,
 		 bClearMotionWarpingOnExitValue = InstanceData.bClearMotionWarpingOnExit,
 		 MotionWarpingNameValue = InstanceData.ActiveMotionWarpingName,
 		 bClearPreInputOnExitValue = bClearPreInputOnExit,
-		 bDisablePreInputOnExitValue = bDisablePreInputOnExit,
-		 bDidCleanup = false](UAnimMontage* Montage, bool bInterrupted) mutable
+		 bDisablePreInputOnExitValue = bDisablePreInputOnExit](UAnimMontage* Montage, bool bInterrupted)
 	{
-		if (MontageEndedPtr)
+		if (RuntimeState.IsValid())
 		{
-			*MontageEndedPtr = true;
-		}
-		if (MontageInterruptedPtr)
-		{
-			*MontageInterruptedPtr = bInterrupted;
+			RuntimeState->bMontageEnded = true;
+			RuntimeState->bMontageInterrupted = bInterrupted;
 		}
 
-		if (!bInterrupted || bDidCleanup)
+		if (!bInterrupted || !RuntimeState.IsValid() || RuntimeState->bInterruptedCleanupDone)
 		{
 			return;
 		}
@@ -511,7 +493,7 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 			return;
 		}
 
-		bDidCleanup = true;
+		RuntimeState->bInterruptedCleanupDone = true;
 		ComboMontagePlayTask::CleanupCharacterState(
 			CharacterInstance,
 			bClearMotionWarpingOnExitValue,
@@ -522,17 +504,14 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::EnterState(FStateTreeExecutionContext
 	AnimInstance->Montage_SetBlendingOutDelegate(BlendingOutDelegate, ComboMontage);
 
 	FOnMontageEnded EndDelegate;
-	EndDelegate.BindLambda(
-		[MontageEndedPtr = &InstanceData.bMontageEnded,
-		 MontageInterruptedPtr = &InstanceData.bMontageInterrupted](UAnimMontage* Montage, bool bInterrupted)
+	EndDelegate.BindWeakLambda(
+		Character,
+		[RuntimeState](UAnimMontage* Montage, bool bInterrupted)
 	{
-		if (MontageEndedPtr)
+		if (RuntimeState.IsValid())
 		{
-			*MontageEndedPtr = true;
-		}
-		if (MontageInterruptedPtr)
-		{
-			*MontageInterruptedPtr = bInterrupted;
+			RuntimeState->bMontageEnded = true;
+			RuntimeState->bMontageInterrupted = bInterrupted;
 		}
 	});
 	AnimInstance->Montage_SetEndDelegate(EndDelegate, ComboMontage);
@@ -573,9 +552,9 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::Tick(FStateTreeExecutionContext& Cont
 		return EStateTreeRunStatus::Failed;
 	}
 
-	if (InstanceData.bMontageEnded)
+	if (InstanceData.RuntimeState.IsValid() && InstanceData.RuntimeState->bMontageEnded)
 	{
-		return InstanceData.bMontageInterrupted ? EStateTreeRunStatus::Failed : EStateTreeRunStatus::Succeeded;
+		return InstanceData.RuntimeState->bMontageInterrupted ? EStateTreeRunStatus::Failed : EStateTreeRunStatus::Succeeded;
 	}
 
 	return EStateTreeRunStatus::Succeeded;
@@ -584,9 +563,11 @@ EStateTreeRunStatus FSTT_ComboMontagePlay::Tick(FStateTreeExecutionContext& Cont
 void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& /*Transition*/) const
 {
 	FSTT_ComboMontagePlayInstanceData& InstanceData = Context.GetInstanceData<FSTT_ComboMontagePlayInstanceData>(*this);
+	AMHWCharacter* Character = InstanceData.MHWCharacter;
+	const bool bHadAppliedAttackSpecTagOverride = InstanceData.bAppliedAttackSpecTagOverride;
 
 	ComboMontagePlayTask::CleanupTaskState(
-		InstanceData.MHWCharacter,
+		Character,
 		ComboMontage,
 		bStopMontageOnExit,
 		InstanceData.bClearMotionWarpingOnExit,
@@ -595,9 +576,9 @@ void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const
 		bDisablePreInputOnExit,
 		InstanceData);
 
-	if (InstanceData.bAppliedAttackSpecTagOverride)
+	if (bHadAppliedAttackSpecTagOverride)
 	{
-		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(InstanceData.MHWCharacter))
+		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(Character))
 		{
 			AttackComponent->ClearActiveAttackSpecTagOverride();
 		}
@@ -605,7 +586,7 @@ void FSTT_ComboMontagePlay::ExitState(FStateTreeExecutionContext& Context, const
 
 	if (bUsePendingChargeLevel && bClearPendingChargeLevelOnExit)
 	{
-		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(InstanceData.MHWCharacter))
+		if (UMHWAttackComponent* AttackComponent = ComboMontagePlayTask::GetAttackComponent(Character))
 		{
 			AttackComponent->ClearPendingChargeLevel();
 		}

@@ -10,6 +10,13 @@ class AMHWCharacter;
 class UAnimInstance;
 class UAnimMontage;
 
+struct FComboMontagePlayRuntimeState
+{
+	bool bMontageEnded = false;
+	bool bMontageInterrupted = false;
+	bool bInterruptedCleanupDone = false;
+};
+
 USTRUCT()
 struct FSTT_ComboMontagePlayInstanceData
 {
@@ -33,15 +40,13 @@ struct FSTT_ComboMontagePlayInstanceData
 	UPROPERTY(EditAnywhere, Category = "Input|Montage")
 	FName StartSection = NAME_None;
 
+	TSharedPtr<FComboMontagePlayRuntimeState> RuntimeState;
 	TWeakObjectPtr<UAnimInstance> CachedAnimInstance = nullptr;
 
 	float PlayedMontageLength = 0.0f;
 	float LastMontagePosition = 0.0f;
 	FName ActiveMotionWarpingName = NAME_None;
 	bool bMontageStarted = false;
-	bool bMontageEnded = false;
-	bool bMontageInterrupted = false;
-	bool bInterruptedCleanupDone = false;
 	bool bAppliedMotionWarping = false;
 	bool bAppliedAttackSpecTagOverride = false;
 };
